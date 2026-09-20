@@ -12,7 +12,7 @@
     "predictbot": "src/cli.js"
   },
   "scripts": {
-    "test": "node --test \"tests/**/*.test.js\"",
+    "test": "node --test tests/*.test.js",
     "predict": "node src/cli.js predict",
     "upcoming": "node src/cli.js upcoming",
     "backtest": "node scripts/backtest.js",
