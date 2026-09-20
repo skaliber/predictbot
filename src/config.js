@@ -10,6 +10,8 @@ export const config = {
     locale: process.env.PREDICTCAMP_LOCALE || 'ro',
     timeoutMs: num(process.env.API_TIMEOUT_MS, 15000),
     retries: num(process.env.API_RETRIES, 2),
+    // API-ul permite 120 cereri/minut; ținem marjă sub limită.
+    maxRequestsPerMinute: num(process.env.API_MAX_RPM, 100),
   },
   footballData: {
     token: process.env.FOOTBALL_DATA_TOKEN?.trim() || undefined,

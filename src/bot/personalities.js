@@ -32,7 +32,7 @@ export const personalities = {
     id: 'ai-analyst',
     name: 'AI Analyst',
     tagline: 'Compară toate modelele înainte să decidă și explică de ce.',
-    weights: { dixonColes: 0.4, elo: 0.3, poisson: 0.2, predictcamp: 0.1 },
+    weights: { dixonColes: 0.35, elo: 0.25, poisson: 0.15, predictcamp: 0.1, ml: 0.15 },
     policy: { markets: ['1x2', 'over_under', 'btts'], minEdgePct: 3, minConfidence: 52, kellyFraction: 0.25 },
     voice: 'analytic',
     adjust: (probs) => probs,
@@ -104,7 +104,7 @@ export const personalities = {
     id: 'value-hunter',
     name: 'Value Hunter',
     tagline: 'Nu pariază pe rezultat, pariază pe preț greșit.',
-    weights: { dixonColes: 0.35, elo: 0.25, poisson: 0.2, predictcamp: 0.2 },
+    weights: { dixonColes: 0.3, elo: 0.2, poisson: 0.15, predictcamp: 0.15, ml: 0.2 },
     // Nu are prag de încredere: contează doar edge-ul vs piață.
     policy: { markets: ['1x2', 'over_under', 'btts'], minEdgePct: 5, minConfidence: 0, kellyFraction: 0.3, requireOdds: true, rankBy: 'edge' },
     voice: 'value',

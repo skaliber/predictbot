@@ -82,6 +82,56 @@ export function buildModelSources(models, { simulations = 10000, seed = 42 } = {
 }
 
 /**
+ * ML 1X2 calibrat ca sursă suplimentară de ensemble.
+ * Acoperă doar PL/LaLiga/Bundesliga/Serie A/Ligue 1 și poate fi oprit
+ * site-wide — de aceea e opțional și nu blochează predicția.
+ */
+export function mlSource(ml) {
+  const p = ml?.prediction ?? ml;
+  const home = p?.home_win_prob, draw = p?.draw_prob, away = p?.away_win_prob;
+  if (![home, draw, away].every((x) => Number.isFinite(x))) return null;
+  return {
+    source: { home_win: home / 100, draw: draw / 100, away_win: away / 100 },
+    detail: {
+      home_win_pct: home, draw_pct: draw, away_win_pct: away,
+      top_pick: p?.top_pick ?? null,
+      calibrated: true,
+      note: 'model ML calibrat, antrenat fără cote de bookmaker',
+    },
+  };
+}
+
+/**
+ * Piețe de colțuri și cartonașe din tendințele istorice.
+ * Liniile vin per echipă; le combinăm pe total meci.
+ */
+export function trendMarkets(trends) {
+  if (!trends?.eligible) return null;
+  const h = trends.home_team, a = trends.away_team;
+  if (!h?.corners || !a?.corners) return null;
+
+  const totalCornersLine = (h.corners.line ?? 0) + (a.corners.line ?? 0);
+  const totalCornersAvg = (h.corners.avg ?? 0) + (a.corners.avg ?? 0);
+  const totalCardsLine = (h.cards?.line ?? 0) + (a.cards?.line ?? 0);
+  const totalCardsAvg = (h.cards?.avg ?? 0) + (a.cards?.avg ?? 0);
+  const sample = Math.min(h.corners.sample_size ?? 0, a.corners.sample_size ?? 0);
+
+  return {
+    corners: {
+      line: totalCornersLine, avg: totalCornersAvg,
+      side: totalCornersAvg > totalCornersLine ? 'over' : 'under',
+      sample_size: sample,
+    },
+    cards: {
+      line: totalCardsLine, avg: totalCardsAvg,
+      side: totalCardsAvg > totalCardsLine ? 'over' : 'under',
+      sample_size: sample,
+    },
+    league_coverage_pct: trends.league_coverage?.coverage_pct ?? null,
+  };
+}
+
+/**
  * Construiește lista de piețe candidate din probabilitățile blendate.
  * `odds` (opțional): { '1x2': [home, draw, away], over_under: [over25, under25], btts: [yes, no] }
  */
@@ -214,6 +264,12 @@ export function runBot(bundle, options = {}) {
   const personality = getPersonality(personalityId);
   const { sources, detail } = buildModelSources(bundle.models, { simulations, seed });
 
+  const ml = mlSource(bundle.ml_1x2);
+  if (ml) { sources.ml = ml.source; detail.ml_1x2 = ml.detail; }
+
+  const trends = trendMarkets(bundle.corner_card_trends);
+  if (trends) detail.trends = trends;
+
   if (!Object.keys(sources).length) {
     throw new Error(`runBot: niciun model utilizabil pentru ${bundle.slug}`);
   }
@@ -251,6 +307,7 @@ export function runBot(bundle, options = {}) {
     model_weights: ensemble.weights,
     models_detail: detail,
     models_consensus: consensus,
+    trends: trends ?? null,
     candidates,
     alternatives: alternatives ?? [],
     partial_sources: bundle.partial ?? null,
@@ -273,4 +330,4 @@ export function runBot(bundle, options = {}) {
   };
 }
 
-export default { runBot, buildModelSources, buildCandidates, selectPick };
+export default { runBot, buildModelSources, buildCandidates, selectPick, mlSource, trendMarkets };

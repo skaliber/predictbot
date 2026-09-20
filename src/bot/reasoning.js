@@ -62,6 +62,20 @@ export function buildReasoning({ analysis, pick, personality, context, reasonNoB
     );
   }
 
+  if (d.ml_1x2) {
+    bullets.push(
+      `ML calibrat: 1 ${d.ml_1x2.home_win_pct}% / X ${d.ml_1x2.draw_pct}% / 2 ${d.ml_1x2.away_win_pct}% ` +
+      '(antrenat fără cote de bookmaker)'
+    );
+  }
+  if (d.trends) {
+    bullets.push(
+      `Tendințe istorice: colțuri ${d.trends.corners.avg.toFixed(1)} vs linia ${d.trends.corners.line} (${d.trends.corners.side}), ` +
+      `cartonașe ${d.trends.cards.avg.toFixed(1)} vs ${d.trends.cards.line} (${d.trends.cards.side}), ` +
+      `eșantion ${d.trends.corners.sample_size} meciuri`
+    );
+  }
+
   const c = analysis.models_consensus;
   if (c?.available) {
     bullets.push(`Acord între modele: ${c.models_for}/${c.models_count} pe „${c.consensus}” (${c.agreement_pct}%, semnal ${c.signal})`);

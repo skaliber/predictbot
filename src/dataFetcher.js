@@ -12,6 +12,13 @@
  */
 import config from './config.js';
 import log from './lib/log.js';
+import { RateLimiter, sleep } from './lib/rateLimiter.js';
+
+/** Un singur limiter pentru tot procesul — API-ul numără per cheie, nu per apel. */
+export const limiter = new RateLimiter({
+  maxRequests: config.api.maxRequestsPerMinute,
+  windowMs: 60_000,
+});
 
 export class ApiError extends Error {
   constructor(message, { status, code, url } = {}) {
@@ -32,6 +39,7 @@ async function request(path, { base, query, headers = {}, retries = config.api.r
 
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
+    await limiter.acquire();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.api.timeoutMs);
     try {
@@ -50,14 +58,24 @@ async function request(path, { base, query, headers = {}, retries = config.api.r
         const err = new ApiError(body?.error || `HTTP ${res.status}`, {
           status: res.status, code: body?.code, url: url.toString(),
         });
-        // 4xx nu se reîncearcă (cheie invalidă, slug inexistent, models not available).
+        // 429: serverul ne spune cât să așteptăm — blocăm tot procesul și reîncercăm.
+        if (res.status === 429) {
+          const resetSec = Number(res.headers.get('ratelimit-reset') ?? res.headers.get('retry-after') ?? 60);
+          const waitMs = (Number.isFinite(resetSec) ? resetSec : 60) * 1000 + 500;
+          limiter.blockFor(waitMs);
+          log.warn('api_rate_limited', { url: url.toString(), wait_ms: waitMs, attempt });
+          lastErr = err;
+          if (attempt < retries) { await sleep(waitMs); continue; }
+          throw err;
+        }
+        // Restul de 4xx nu se reîncearcă (cheie invalidă, slug inexistent, 404).
         if (res.status < 500) throw err;
         lastErr = err;
       } else {
         return body;
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status < 500) throw err;
+      if (err instanceof ApiError && err.status < 500 && err.status !== 429) throw err;
       lastErr = err;
       log.warn('api_retry', { url: url.toString(), attempt, error: err.message });
     } finally {
@@ -128,6 +146,21 @@ export async function listBots() {
   return request('/bots');
 }
 
+/** Statistici granulare (stil footystats): Over/Under, BTTS, colțuri, cartonașe. */
+export async function getGranularStats(slug) {
+  return request(`/matches/${encodeURIComponent(slug)}/granular-stats`);
+}
+
+/** Tendințe istorice de colțuri / cartonașe / șuturi, cu linii și încredere. */
+export async function getCornerCardTrends(slug) {
+  return request(`/matches/${encodeURIComponent(slug)}/corner-card-trends`);
+}
+
+/** Statistici de meci (goluri, penalty shootout). */
+export async function getMatchStats(slug) {
+  return request(`/matches/${encodeURIComponent(slug)}/stats`);
+}
+
 /** `from`/`to` din API acceptă doar YYYY-MM-DD, nu ISO 8601 complet. */
 export function toApiDate(value) {
   const d = value instanceof Date ? value : new Date(value);
@@ -151,36 +184,50 @@ export async function getUpcomingMatches({ hoursAhead = config.cron.hoursAhead, 
   });
 }
 
+/** Sursele opționale ale bundle-ului și funcțiile care le aduc. */
+const OPTIONAL_SOURCES = {
+  context: getMatchContext,
+  bot_predictions: getBotPredictions,
+  ml_1x2: getMl1x2,
+  granular_stats: getGranularStats,
+  corner_card_trends: getCornerCardTrends,
+};
+
+export const DEFAULT_INCLUDE = ['context', 'bot_predictions', 'ml_1x2', 'corner_card_trends'];
+
 /**
- * Pachetul complet pentru un meci. Sursele opționale (ml-1x2, bot-predictions)
- * nu blochează predicția dacă lipsesc — se raportează în `partial`.
+ * Pachetul complet pentru un meci. `models` e obligatoriu; restul surselor nu
+ * blochează predicția dacă lipsesc — se raportează în `partial`.
+ *
+ * ml_1x2 dă 404 în afara celor 5 ligi mari (sau când modelul e oprit), iar
+ * corner_card_trends poate întoarce `eligible: false` — ambele sunt normale.
  */
-export async function fetchMatchBundle(slug) {
-  const [models, context, bots, ml] = await Promise.allSettled([
+export async function fetchMatchBundle(slug, { include = DEFAULT_INCLUDE } = {}) {
+  const wanted = include.filter((name) => OPTIONAL_SOURCES[name]);
+  const [modelsResult, ...rest] = await Promise.allSettled([
     getMatchModels(slug),
-    getMatchContext(slug),
-    getBotPredictions(slug),
-    getMl1x2(slug),
+    ...wanted.map((name) => OPTIONAL_SOURCES[name](slug)),
   ]);
-  const unwrap = (r) => (r.status === 'fulfilled' ? r.value : null);
-  const failed = [];
-  const named = { models, context, bots, ml };
-  for (const [name, r] of Object.entries(named)) {
-    if (r.status === 'rejected') failed.push({ source: name, error: r.reason?.message, code: r.reason?.code });
-  }
-  if (models.status === 'rejected') {
-    throw new ApiError(`models indisponibile pentru ${slug}: ${models.reason?.message}`, {
-      code: models.reason?.code, status: models.reason?.status,
+
+  if (modelsResult.status === 'rejected') {
+    const reason = modelsResult.reason;
+    throw new ApiError(`models indisponibile pentru ${slug}: ${reason?.message}`, {
+      code: reason?.code, status: reason?.status,
     });
   }
-  return {
-    slug,
-    models: unwrap(models),
-    context: unwrap(context),
-    bot_predictions: unwrap(bots),
-    ml_1x2: unwrap(ml),
-    partial: failed.length ? failed : null,
-  };
+
+  const bundle = { slug, models: modelsResult.value };
+  const failed = [];
+  wanted.forEach((name, i) => {
+    const r = rest[i];
+    bundle[name] = r.status === 'fulfilled' ? r.value : null;
+    if (r.status === 'rejected') {
+      failed.push({ source: name, error: r.reason?.message, code: r.reason?.code });
+    }
+  });
+  bundle.partial = failed.length ? failed : null;
+  bundle.fetched_at = new Date().toISOString();
+  return bundle;
 }
 
 /* ---------- football-data.org (opțional) ---------- */
@@ -198,6 +245,7 @@ export async function getFootballDataFixtures({ competition, dateFrom, dateTo } 
 }
 
 export default {
-  toApiDate, listMatches, listMatchesPage, MAX_PAGE_LIMIT, getMatch, getMatchModels, getMatchContext, getBotPredictions,
+  toApiDate, listMatches, listMatchesPage, MAX_PAGE_LIMIT, getMatch,
+  getGranularStats, getCornerCardTrends, getMatchStats, limiter, DEFAULT_INCLUDE, getMatchModels, getMatchContext, getBotPredictions,
   getMl1x2, listBots, getUpcomingMatches, fetchMatchBundle, getFootballDataFixtures, ApiError,
 };

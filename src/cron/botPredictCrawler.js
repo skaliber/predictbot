@@ -16,21 +16,36 @@ const BOTS = (process.env.CRAWLER_BOTS || config.bot.id)
 
 async function main() {
   const started = Date.now();
-  const summary = [];
-  for (const botId of BOTS) {
-    if (!personalities[botId]) { log.warn('crawler_unknown_bot', { botId }); continue; }
-    const results = await predictUpcoming({ personalityId: botId, persist: true });
-    const ok = results.filter((r) => !r.error);
-    summary.push({
+  const bots = BOTS.filter((id) => {
+    if (personalities[id]) return true;
+    log.warn('crawler_unknown_bot', { botId: id });
+    return false;
+  });
+  if (!bots.length) throw new Error('niciun bot valid în CRAWLER_BOTS');
+
+  // Un singur fetch per meci, refolosit de toate personalitățile (rate limit).
+  const results = await predictUpcoming({ personalityIds: bots, persist: true });
+
+  const summary = bots.map((botId) => {
+    const mine = results.filter((r) => r.bot?.id === botId);
+    const ok = mine.filter((r) => !r.error);
+    return {
       bot: botId,
-      matches: results.length,
+      matches: mine.length,
       predictions: ok.filter((r) => r.selection).length,
       no_bets: ok.filter((r) => !r.selection).length,
-      errors: results.length - ok.length,
-    });
-  }
-  log.info('crawler_done', { duration_ms: Date.now() - started, window_hours: config.cron.hoursAhead, summary });
-  console.log(JSON.stringify({ ok: true, summary }, null, 2));
+      errors: mine.length - ok.length,
+    };
+  });
+  const matchErrors = results.filter((r) => r.error && !r.bot).length;
+
+  log.info('crawler_done', {
+    duration_ms: Date.now() - started,
+    window_hours: config.cron.hoursAhead,
+    match_errors: matchErrors,
+    summary,
+  });
+  console.log(JSON.stringify({ ok: true, match_errors: matchErrors, summary }, null, 2));
 }
 
 main().catch((err) => {

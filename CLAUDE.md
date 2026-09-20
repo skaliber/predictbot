@@ -36,8 +36,31 @@ locale: `X-Locale: ro` · rate limit: 120 req/min pe endpoint-urile de date.
 | `GET /matches/{slug}/models` | `poisson`, `elitul.dixon_coles`, `elitul.monte_carlo`, `elo`, `glicko2`, `ensemble`, `models_consensus` | **doar înainte de start**; după meci → `422 MODELS_NOT_AVAILABLE` |
 | `GET /matches/{slug}/context` | H2H (ultimele 10), formă (ultimele 5/echipă), statistici sezon | cache 1h; `form_order: newest_first` |
 | `GET /matches/{slug}/bots` | predicțiile boților PredictCamp | **nu** `/bot-predictions` — calea aia nu există (500) |
-| `GET /matches/{slug}/ml-1x2` | probabilități ML calibrate | 404 pe ligile fără model antrenat — se degradează grațios |
+| `GET /matches/{slug}/ml-1x2` | probabilități ML calibrate | doar PL/LaLiga/Bundesliga/Serie A/Ligue 1; 404 în rest sau când modelul e oprit |
+| `GET /matches/{slug}/corner-card-trends` | medii colțuri/cartonașe/șuturi, linii, încredere | `eligible: false` pe ligile fără acoperire |
+| `GET /matches/{slug}/granular-stats` | Over/Under, BTTS, forme, goluri pe minut, poziție | fiecare secțiune e nullable independent |
 | `GET /bots` | catalogul de boți PredictCamp | — |
+
+### ⚠️ API-ul NU expune cote de bookmaker
+
+Nu există niciun câmp de odds în OpenAPI. Modelul ML spune explicit că a fost
+antrenat **fără** cote („they are excluded from its inputs by design"). Deci:
+
+- `edge_pct`, `ev_percent` și `kelly_stake` sunt `null` dacă nu primești cote
+  din altă parte — botul cade elegant pe selecție bazată pe încredere.
+- Cotele se dau din exterior: `--odds` la CLI, `odds` în body-ul POST, sau
+  skill-ul `markets` (Kalshi / Polymarket) pentru prețuri de piață de predicții.
+- `value-hunter` **refuză** să parieze fără cote — by design.
+
+### Rate limit: 120 cereri/minut
+
+Un bundle costă până la 5 cereri. Refetch-ul per personalitate înmulțea costul
+cu 7 și epuiza fereastra după ~3 meciuri. **Fetch-ul se face o singură dată per
+meci** (`predictMatchForBots`) și se refolosește la toate personalitățile.
+`src/lib/rateLimiter.js` ține un token bucket la 100/min (marjă sub limită), iar
+un 429 blochează tot procesul până expiră `ratelimit-reset`.
+
+`limit` la `/matches` e plafonat la **50** — `listMatches` paginează automat.
 
 **Probabilitățile din API sunt procente (0–100).** Intern lucrăm cu fracții (0–1);
 conversia se face o singură dată, în `buildModelSources`.
