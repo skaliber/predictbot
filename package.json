@@ -1,0 +1,29 @@
+{
+  "name": "predictbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Analyst — bot de predicții fotbal peste PredictCamp API, modele Dixon-Coles/Monte Carlo/Elo și matematică de pariuri (de-vig, edge, Kelly).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/index.js",
+  "bin": {
+    "predictbot": "src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\"",
+    "predict": "node src/cli.js predict",
+    "upcoming": "node src/cli.js upcoming",
+    "backtest": "node scripts/backtest.js",
+    "crawler": "node src/cron/botPredictCrawler.js",
+    "serve": "node src/server.js",
+    "lint": "node --check src/index.js",
+    "settle": "node scripts/settle.js",
+    "report": "node scripts/report.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}

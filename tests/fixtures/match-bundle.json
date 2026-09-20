@@ -1,0 +1,46 @@
+{
+  "slug": "scottish-premiership-rangers-vs-kilmarnock-2026-10-10",
+  "models": {
+    "poisson": {
+      "lambda_home": 1.7848, "lambda_away": 0.86,
+      "home_win_prob": 59.3, "draw_prob": 23, "away_win_prob": 17.8,
+      "over25_prob": 49.3, "most_likely_score": "1-0"
+    },
+    "elitul": {
+      "dixon_coles": {
+        "lambda_home": 2.71212, "lambda_away": 1.019,
+        "data_sufficiency": { "homeIsFallback": false, "awayIsFallback": false, "sampleSize": { "home": 77, "away": 77 } }
+      },
+      "monte_carlo": {
+        "simulations": 10000, "home_win_prob": 73.8, "draw_prob": 14.9, "away_win_prob": 11.3,
+        "over25_prob": 73.6, "btts_prob": 60.7, "most_likely_score": "2-0"
+      }
+    },
+    "elo": { "home_rating": 1633, "away_rating": 1388, "diff": 245, "home_win_prob": 61, "draw_prob": 28, "away_win_prob": 11 },
+    "ensemble": {
+      "available": true, "calibrated": true, "models_used": 3,
+      "home_win_prob": 65, "draw_prob": 22, "away_win_prob": 13,
+      "prediction": "1", "confidence": 65
+    }
+  },
+  "context": {
+    "h2h": { "matches": [], "home_wins": 8, "draws": 0, "away_wins": 2, "avg_goals_per_match": 3.9, "over25_pct": 80, "matches_analyzed": 10 },
+    "home_form": [
+      { "result": "W", "goals_for": 1, "goals_against": 0, "date": "2026-09-20", "opponent": "Celtic FC" },
+      { "result": "W", "goals_for": 1, "goals_against": 0, "date": "2026-09-09", "opponent": "St. Mirren" },
+      { "result": "W", "goals_for": 1, "goals_against": 0, "date": "2026-09-05", "opponent": "Motherwell" },
+      { "result": "W", "goals_for": 2, "goals_against": 1, "date": "2026-09-02", "opponent": "Falkirk" },
+      { "result": "W", "goals_for": 1, "goals_against": 0, "date": "2026-08-30", "opponent": "Aberdeen" }
+    ],
+    "away_form": [
+      { "result": "D", "goals_for": 1, "goals_against": 1, "date": "2026-09-19", "opponent": "Hearts" },
+      { "result": "W", "goals_for": 1, "goals_against": 0, "date": "2026-09-15", "opponent": "Hibernian" },
+      { "result": "D", "goals_for": 0, "goals_against": 0, "date": "2026-09-05", "opponent": "Aberdeen" },
+      { "result": "L", "goals_for": 0, "goals_against": 1, "date": "2026-09-02", "opponent": "St. Mirren" },
+      { "result": "L", "goals_for": 0, "goals_against": 4, "date": "2026-08-29", "opponent": "Dundee United" }
+    ]
+  },
+  "bot_predictions": null,
+  "ml_1x2": null,
+  "partial": null
+}
