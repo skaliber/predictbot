@@ -56,3 +56,14 @@ test('rută necunoscută întoarce 404 JSON', async () => {
     assert.equal((await res.json()).code, 'NOT_FOUND');
   } finally { server.close(); }
 });
+
+test('createApp nu pornește singur un listener (entrypoint-ul e src/bin/serve.js)', async () => {
+  // Regresie: garda import.meta.url nu se potrivea sub PM2, iar procesul pornea
+  // fără să asculte pe niciun port. Acum pornirea e explicită, în serve.js.
+  const app = createApp();
+  assert.equal(typeof app.listen, 'function');
+  const src = await import('node:fs/promises').then((fs) =>
+    fs.readFile(new URL('../src/server.js', import.meta.url), 'utf8'));
+  assert.ok(!src.includes('process.argv[1]'), 'server.js nu trebuie să conțină gardă pe argv');
+  assert.ok(!/app\.listen\(/.test(src), 'server.js nu trebuie să apeleze listen');
+});

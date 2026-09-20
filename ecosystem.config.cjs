@@ -4,7 +4,7 @@ module.exports = {
     {
       name: 'predictbot-api',
       cwd: '/var/www/predictbot',
-      script: 'src/server.js',
+      script: 'src/bin/serve.js',
       instances: 1,
       exec_mode: 'fork',
       env: { NODE_ENV: 'production' },

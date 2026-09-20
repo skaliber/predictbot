@@ -17,7 +17,7 @@
     "upcoming": "node src/cli.js upcoming",
     "backtest": "node scripts/backtest.js",
     "crawler": "node src/cron/botPredictCrawler.js",
-    "serve": "node src/server.js",
+    "serve": "node src/bin/serve.js",
     "lint": "node --check src/index.js",
     "settle": "node scripts/settle.js",
     "report": "node scripts/report.js"

@@ -11,7 +11,6 @@ import express from 'express';
 import { predictMatch, personalities } from './index.js';
 import { loadPredictions } from './lib/store.js';
 import { summarize } from './lib/accuracy.js';
-import config from './config.js';
 import log from './lib/log.js';
 
 export function createApp() {
@@ -62,11 +61,6 @@ export function createApp() {
 
   app.use((_req, res) => res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }));
   return app;
-}
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const app = createApp();
-  app.listen(config.server.port, () => log.info('server_listening', { port: config.server.port }));
 }
 
 export default createApp;
