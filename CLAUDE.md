@@ -41,26 +41,40 @@ locale: `X-Locale: ro` · rate limit: 120 req/min pe endpoint-urile de date.
 | `GET /matches/{slug}/granular-stats` | Over/Under, BTTS, forme, goluri pe minut, poziție | fiecare secțiune e nullable independent |
 | `GET /bots` | catalogul de boți PredictCamp | — |
 
-### ⚠️ API-ul NU expune cote de bookmaker
+### Cotele vin din API, dar numai pe chei cu scope admin
 
-Nu există niciun câmp de odds în OpenAPI. Modelul ML spune explicit că a fost
-antrenat **fără** cote („they are excluded from its inputs by design"). Deci:
+`GET /matches` și `GET /matches/{slug}` întorc `market_odds` (1X2 de la
+livescore) **doar** dacă `user_api_keys.scope = 'admin'`. Pe o cheie publică
+câmpul lipsește complet — de aceea nu apare în specul OpenAPI public.
 
-- `edge_pct`, `ev_percent` și `kelly_stake` sunt `null` dacă nu primești cote
-  din altă parte — botul cade elegant pe selecție bazată pe încredere.
-- Cotele se dau din exterior: `--odds` la CLI, `odds` în body-ul POST, sau
-  skill-ul `markets` (Kalshi / Polymarket) pentru prețuri de piață de predicții.
-- `value-hunter` **refuză** să parieze fără cote — by design.
+```json
+"market_odds": { "odds_1": 1.25, "odds_x": 5, "odds_2": 11,
+                 "source": "livescore", "updated_at": "..." }
+```
 
-### Rate limit: 120 cereri/minut
+Ordinea de precedență a cotelor în bot:
+1. cote explicite (`--odds` la CLI, `odds` în body-ul POST) → `odds_source: "furnizate"`
+2. `market_odds` din bundle → `odds_source: "predictcamp_market_odds"`
+3. niciuna → `edge_pct`/`kelly_stake` rămân `null`, selecția merge pe încredere
+
+Nu orice meci are cote — sunt disponibile în principal pe ligile mari, și
+lipsesc pentru fixture-uri îndepărtate. `value-hunter` **refuză** să parieze
+fără cote, by design.
+
+**Rolul ≠ scope-ul.** `users.role = 'admin'` ridică limitele (rate limit, cotă
+zilnică, plafon de pagină); `user_api_keys.scope = 'admin'` dă acces la
+`market_odds`. Sunt privilegii independente.
+
+### Rate limit: 120/min public, 6000/min pe conturi admin
 
 Un bundle costă până la 5 cereri. Refetch-ul per personalitate înmulțea costul
 cu 7 și epuiza fereastra după ~3 meciuri. **Fetch-ul se face o singură dată per
 meci** (`predictMatchForBots`) și se refolosește la toate personalitățile.
-`src/lib/rateLimiter.js` ține un token bucket la 100/min (marjă sub limită), iar
-un 429 blochează tot procesul până expiră `ratelimit-reset`.
+`src/lib/rateLimiter.js` ține un token bucket (implicit 100/min, ridicabil prin
+`API_MAX_RPM`), iar un 429 blochează tot procesul până expiră `ratelimit-reset`.
 
-`limit` la `/matches` e plafonat la **50** — `listMatches` paginează automat.
+`limit` la `/matches` e plafonat la **50** pe chei normale și **500** pe conturi
+admin — `listMatches` paginează automat oricum.
 
 **Probabilitățile din API sunt procente (0–100).** Intern lucrăm cu fracții (0–1);
 conversia se face o singură dată, în `buildModelSources`.

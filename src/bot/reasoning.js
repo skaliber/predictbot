@@ -99,7 +99,13 @@ export function buildReasoning({ analysis, pick, personality, context, reasonNoB
     );
     bullets.push(`Miza Kelly fracționat (${personality.policy.kellyFraction}): ${(pick.kelly_stake * 100).toFixed(2)}% din bankroll`);
   } else if (pick) {
-    bullets.push('Fără cote furnizate — selecția e pe încredere de model, nu pe value.');
+    bullets.push('Fără cote disponibile — selecția e pe încredere de model, nu pe value.');
+  }
+  if (analysis.odds_source === 'predictcamp_market_odds' && analysis.odds_meta) {
+    bullets.push(
+      `Cote de piață din PredictCamp (${analysis.odds_meta.source ?? 'necunoscut'}), ` +
+      `actualizate ${analysis.odds_meta.updated_at?.slice(0, 16).replace('T', ' ') ?? 'n/a'}`
+    );
   }
 
   const opener = VOICE_OPENERS[personality.voice] ?? VOICE_OPENERS.analytic;

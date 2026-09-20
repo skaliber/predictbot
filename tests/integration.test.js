@@ -169,3 +169,73 @@ test('trendMarkets ajunge în reasoning', () => {
   assert.equal(r.trends.corners.side, 'over');
   assert.ok(r.reasoning.bullets.some((x) => x.includes('Tendințe istorice')));
 });
+
+// ---- cote de piață din PredictCamp (chei cu scope admin) ----
+
+test('extractOdds normalizează market_odds, sau întoarce null', async () => {
+  const { extractOdds } = await import('../src/dataFetcher.js');
+  const r = extractOdds({ market_odds: { odds_1: 1.25, odds_x: 5, odds_2: 11, source: 'livescore', updated_at: '2026-09-20T10:00:52.473Z' } });
+  assert.deepEqual(r.odds, { '1x2': [1.25, 5, 11] });
+  assert.equal(r.meta.source, 'livescore');
+
+  assert.equal(extractOdds(null), null, 'meci lipsă');
+  assert.equal(extractOdds({}), null, 'fără market_odds (cheie non-admin)');
+  assert.equal(extractOdds({ market_odds: { odds_1: 1.25, odds_x: 5 } }), null, 'cotă lipsă');
+  assert.equal(extractOdds({ market_odds: { odds_1: 0.9, odds_x: 5, odds_2: 11 } }), null, 'cotă <= 1');
+});
+
+test('botul folosește cotele de piață din bundle, fără să i se dea explicit', () => {
+  const b = clone();
+  // Cote care lasă edge pentru favorit (modelul dă ~69% gazdelor).
+  b.market_odds = { '1x2': [2.10, 3.40, 3.60] };
+  b.market_odds_meta = { source: 'livescore', updated_at: '2026-09-20T10:00:52.473Z' };
+  const r = runBot(b, { personalityId: 'ai-analyst', simulations: 1000 });
+  assert.equal(r.odds_source, 'predictcamp_market_odds');
+  assert.ok(Number.isFinite(r.edge_pct), 'edge calculat fără --odds');
+  assert.ok(Number.isFinite(r.kelly_stake));
+  assert.ok(r.reasoning.bullets.some((x) => x.includes('Cote de piață din PredictCamp')));
+});
+
+test('cotele explicite au prioritate față de cele din bundle', () => {
+  const b = clone();
+  b.market_odds = { '1x2': [1.30, 5.50, 9.00] };
+  b.market_odds_meta = { source: 'livescore' };
+  const r = runBot(b, { personalityId: 'ai-analyst', odds: { '1x2': [2.50, 3.40, 2.90] }, simulations: 1000 });
+  assert.equal(r.odds_source, 'furnizate');
+  assert.equal(r.odds_meta, null);
+  const pick = r.candidates.find((c) => c.selection === '1');
+  assert.ok(Math.abs(pick.book_odds - 2.50) < 0.01, `cota folosită ${pick.book_odds}`);
+});
+
+test('fără cote nicăieri, value-hunter refuză și restul merg pe încredere', () => {
+  const b = clone();
+  assert.equal(b.market_odds, undefined);
+  const vh = runBot(b, { personalityId: 'value-hunter', simulations: 500 });
+  assert.equal(vh.odds_source, null);
+  assert.equal(vh.selection, null);
+  const analyst = runBot(clone(), { personalityId: 'ai-analyst', simulations: 500 });
+  assert.equal(analyst.edge_pct, null);
+  assert.ok(analyst.selection, 'restul aleg pe încredere');
+});
+
+test('fetchMatchBundle extrage cotele din /matches/{slug}', async () => {
+  const { fetchMatchBundle, limiter } = await import('../src/dataFetcher.js');
+  limiter.blockedUntil = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const p = new URL(url).pathname;
+    if (p.endsWith('/models')) return new Response(JSON.stringify(bundle.models), { status: 200 });
+    if (/\/matches\/[^/]+$/.test(p)) {
+      return new Response(JSON.stringify({
+        slug: 'a-vs-b',
+        market_odds: { odds_1: 2.1, odds_x: 3.4, odds_2: 3.6, source: 'livescore' },
+      }), { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  };
+  try {
+    const b = await fetchMatchBundle('a-vs-b');
+    assert.deepEqual(b.market_odds, { '1x2': [2.1, 3.4, 3.6] });
+    assert.equal(b.market_odds_meta.source, 'livescore');
+  } finally { globalThis.fetch = realFetch; }
+});

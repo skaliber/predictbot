@@ -261,6 +261,11 @@ export function runBot(bundle, options = {}) {
     match = null,
   } = options;
 
+  // Cotele explicite (CLI / body) au prioritate; altfel folosim cotele de piață
+  // din bundle, disponibile pe cheile cu scope admin.
+  const effectiveOdds = odds ?? bundle.market_odds ?? null;
+  const oddsSource = odds ? 'furnizate' : (bundle.market_odds ? 'predictcamp_market_odds' : null);
+
   const personality = getPersonality(personalityId);
   const { sources, detail } = buildModelSources(bundle.models, { simulations, seed });
 
@@ -285,7 +290,7 @@ export function runBot(bundle, options = {}) {
     btts_yes: ensemble.btts_yes ?? sources.monteCarlo?.btts_yes ?? sources.dixonColes?.btts_yes,
   };
 
-  const candidates = buildCandidates({ probs: adjusted, secondary, odds, personality, oddsFormat });
+  const candidates = buildCandidates({ probs: adjusted, secondary, odds: effectiveOdds, personality, oddsFormat });
   const hasOdds = candidates.some((c) => Number.isFinite(c.edge_pct));
   const { pick, alternatives, reason_no_bet } = selectPick(candidates, personality, { hasOdds });
 
@@ -308,6 +313,8 @@ export function runBot(bundle, options = {}) {
     models_detail: detail,
     models_consensus: consensus,
     trends: trends ?? null,
+    odds_source: oddsSource,
+    odds_meta: oddsSource === 'predictcamp_market_odds' ? bundle.market_odds_meta : null,
     candidates,
     alternatives: alternatives ?? [],
     partial_sources: bundle.partial ?? null,

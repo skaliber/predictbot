@@ -7,6 +7,9 @@
  *   GET /matches/{slug}/models            — Poisson, Dixon-Coles, Elo, Glicko2, ensemble
  *   GET /matches/{slug}/context           — H2H, formă, statistici sezon
  *   GET /matches/{slug}/bots              — predicțiile boților PredictCamp
+ *
+ * Cheile cu `scope: 'admin'` primesc în plus `market_odds` (1X2 de la livescore)
+ * pe /matches și /matches/{slug} — de acolo vine edge-ul real al botului.
  *   GET /matches/{slug}/ml-1x2            — probabilități ML calibrate
  *   GET /bots                             — catalogul de boți
  */
@@ -125,6 +128,24 @@ export async function getMatch(slug) {
   return request(`/matches/${encodeURIComponent(slug)}`);
 }
 
+/**
+ * Normalizează `market_odds` din API în forma pe care o așteaptă botul.
+ * Prezent doar pentru chei cu scope admin; `null` altfel.
+ */
+export function extractOdds(match) {
+  const o = match?.market_odds;
+  const trio = [o?.odds_1, o?.odds_x, o?.odds_2].map(Number);
+  if (!trio.every((v) => Number.isFinite(v) && v > 1)) return null;
+  return {
+    odds: { '1x2': trio },
+    meta: {
+      source: o.source ?? null,
+      fetched_at: o.fetched_at ?? null,
+      updated_at: o.updated_at ?? null,
+    },
+  };
+}
+
 export async function getMatchModels(slug) {
   return request(`/matches/${encodeURIComponent(slug)}/models`);
 }
@@ -186,6 +207,7 @@ export async function getUpcomingMatches({ hoursAhead = config.cron.hoursAhead, 
 
 /** Sursele opționale ale bundle-ului și funcțiile care le aduc. */
 const OPTIONAL_SOURCES = {
+  match: getMatch,
   context: getMatchContext,
   bot_predictions: getBotPredictions,
   ml_1x2: getMl1x2,
@@ -193,7 +215,7 @@ const OPTIONAL_SOURCES = {
   corner_card_trends: getCornerCardTrends,
 };
 
-export const DEFAULT_INCLUDE = ['context', 'bot_predictions', 'ml_1x2', 'corner_card_trends'];
+export const DEFAULT_INCLUDE = ['context', 'bot_predictions', 'ml_1x2', 'corner_card_trends', 'match'];
 
 /**
  * Pachetul complet pentru un meci. `models` e obligatoriu; restul surselor nu
@@ -227,6 +249,11 @@ export async function fetchMatchBundle(slug, { include = DEFAULT_INCLUDE } = {})
   });
   bundle.partial = failed.length ? failed : null;
   bundle.fetched_at = new Date().toISOString();
+
+  // Cotele de piață vin pe /matches/{slug}, doar pentru chei cu scope admin.
+  const odds = extractOdds(bundle.match);
+  bundle.market_odds = odds?.odds ?? null;
+  bundle.market_odds_meta = odds?.meta ?? null;
   return bundle;
 }
 
@@ -246,6 +273,6 @@ export async function getFootballDataFixtures({ competition, dateFrom, dateTo } 
 
 export default {
   toApiDate, listMatches, listMatchesPage, MAX_PAGE_LIMIT, getMatch,
-  getGranularStats, getCornerCardTrends, getMatchStats, limiter, DEFAULT_INCLUDE, getMatchModels, getMatchContext, getBotPredictions,
+  getGranularStats, getCornerCardTrends, getMatchStats, limiter, DEFAULT_INCLUDE, extractOdds, getMatchModels, getMatchContext, getBotPredictions,
   getMl1x2, listBots, getUpcomingMatches, fetchMatchBundle, getFootballDataFixtures, ApiError,
 };
