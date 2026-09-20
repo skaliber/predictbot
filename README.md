@@ -120,11 +120,13 @@ metrica standard pentru rezultate ordonate), **ROI Kelly** și **ROI flat 1u**.
 ## Deploy
 
 ```bash
-./scripts/deploy.sh          # rsync + npm ci + pm2 reload pe /var/www/predictbot
+./scripts/deploy.sh          # teste → git pull pe server → npm ci → teste → pm2 reload
 ```
 
-PM2: `predictbot-api` (HTTP) și `predictbot-crawler` (cron 06:00). Izolat de
-`seap-app` și de procesele DosarJust de pe același VPS.
+Rulează în `/var/www/predictbot` pe `62.171.157.32`, portul **3081**.
+PM2: `predictbot-api` (HTTP) și `predictbot-crawler` (cron 06:00).
+Izolat de PredictCamp (3007/3008), SEAP, DosarJust și pretbox de pe același VPS —
+vezi [.claude/server.md](.claude/server.md).
 
 ## Licență
 

@@ -116,7 +116,8 @@ npm run crawler                                    # generează + salvează pred
 npm run settle                                     # atașează rezultatele reale
 npm run report                                     # leaderboard acuratețe/ROI
 npm run backtest -- --refit --limit=200            # walk-forward Dixon-Coles
-npm run serve                                      # HTTP API pe PORT
+npm run serve                                      # HTTP API pe PORT (3081)
+./scripts/deploy.sh                                # deploy pe 62.171.157.32
 ```
 
 ## Reguli
@@ -125,7 +126,10 @@ npm run serve                                      # HTTP API pe PORT
    cunoscute, nu cu snapshot-uri.
 2. **Nu chema rețeaua din teste.** Folosește fixture-ul.
 3. **Probabilitățile trebuie să însumeze 1.** Există teste pentru asta în fiecare model.
-4. **Nu atinge `/var/www/seap-app` sau procesele DosarJust** pe VPS — PredictBot
-   trăiește în `/var/www/predictbot`, cu procese PM2 proprii (`predictbot-api`,
-   `predictbot-crawler`).
-5. Commit: `tip(modul): descriere` — ex. `feat(models): adaugă Glicko-2`.
+4. **Serverul e partajat.** PredictBot trăiește în `/var/www/predictbot`, pe portul
+   **3081**, cu procese PM2 proprii (`predictbot-api`, `predictbot-crawler`).
+   Nu atinge DosarJust, SEAP, pretbox sau PredictCamp. Detalii de conectare,
+   harta porturilor și pașii de deploy: **[.claude/server.md](.claude/server.md)**.
+5. **Secretele nu se commit-ează.** `PREDICTCAMP_API_KEY` trăiește doar în
+   `/var/www/predictbot/.env` (chmod 600) și în `.env`-ul local.
+6. Commit: `tip(modul): descriere` — ex. `feat(models): adaugă Glicko-2`.
