@@ -143,6 +143,16 @@ npm run serve                                      # HTTP API pe PORT (3081)
 ./scripts/deploy.sh                                # deploy pe 62.171.157.32
 ```
 
+## Capcane de operare
+
+- **Rulează scripturile direct, nu prin `npm run`**, când parsezi ieșirea: npm
+  scrie bannerul (`> predictbot@0.1.0 settle`) pe stdout și strică JSON-ul.
+  `node scripts/settle.js | jq` ✅ — `npm run settle | jq` ❌.
+- **Log-urile merg pe stderr**, la toate nivelurile. stdout e doar pentru
+  rezultatul programului.
+- `npm test` folosește `node --test tests/*.test.js` — globul intern al `--test`
+  există doar din Node 22, iar serverul are Node 20.
+
 ## Reguli
 
 1. **Teste pentru orice modificare.** Matematica se testează cu valori analitice
