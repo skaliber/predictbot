@@ -99,11 +99,22 @@ export async function listBots() {
   return request('/bots');
 }
 
-/** Meciurile care intră în fereastra de predicție (implicit 2–48h înainte de start). */
+/** `from`/`to` din API acceptă doar YYYY-MM-DD, nu ISO 8601 complet. */
+export function toApiDate(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) throw new TypeError(`dată invalidă: ${value}`);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Meciurile care intră în fereastra de predicție (implicit 2–48h înainte de start).
+ * Filtrul de zi merge la API; fereastra exactă în ore se aplică local, fiindcă
+ * API-ul are granularitate de zi.
+ */
 export async function getUpcomingMatches({ hoursAhead = config.cron.hoursAhead, hoursMin = config.cron.hoursMin, league, limit = 100 } = {}) {
   const now = Date.now();
-  const from = new Date(now + hoursMin * 3600_000).toISOString();
-  const to = new Date(now + hoursAhead * 3600_000).toISOString();
+  const from = toApiDate(now + hoursMin * 3600_000);
+  const to = toApiDate(now + hoursAhead * 3600_000);
   const matches = await listMatches({ status: 'TIMED', league, from, to, limit });
   return matches.filter((m) => {
     const t = new Date(m.match_date).getTime();
@@ -158,6 +169,6 @@ export async function getFootballDataFixtures({ competition, dateFrom, dateTo } 
 }
 
 export default {
-  listMatches, getMatch, getMatchModels, getMatchContext, getBotPredictions,
+  toApiDate, listMatches, getMatch, getMatchModels, getMatchContext, getBotPredictions,
   getMl1x2, listBots, getUpcomingMatches, fetchMatchBundle, getFootballDataFixtures, ApiError,
 };

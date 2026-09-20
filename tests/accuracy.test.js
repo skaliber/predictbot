@@ -46,3 +46,13 @@ test('summarize pe set gol nu împarte la zero', () => {
   assert.equal(s.kelly_roi_pct, null);
   assert.equal(s.flat_roi_pct, null);
 });
+
+// ---- dataFetcher: formatarea datelor pentru API ----
+import { toApiDate } from '../src/dataFetcher.js';
+
+test('toApiDate produce YYYY-MM-DD (API-ul respinge ISO 8601 complet)', () => {
+  assert.equal(toApiDate('2026-10-10T14:00:00.000Z'), '2026-10-10');
+  assert.equal(toApiDate(new Date(Date.UTC(2026, 9, 10, 23, 59))), '2026-10-10');
+  assert.equal(toApiDate(Date.UTC(2026, 0, 1)), '2026-01-01');
+  assert.throws(() => toApiDate('nu e o dată'), /dată invalidă/);
+});
