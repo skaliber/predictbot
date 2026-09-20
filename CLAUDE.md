@@ -70,8 +70,12 @@ zilnică, plafon de pagină); `user_api_keys.scope = 'admin'` dă acces la
 Un bundle costă până la 5 cereri. Refetch-ul per personalitate înmulțea costul
 cu 7 și epuiza fereastra după ~3 meciuri. **Fetch-ul se face o singură dată per
 meci** (`predictMatchForBots`) și se refolosește la toate personalitățile.
-`src/lib/rateLimiter.js` ține un token bucket (implicit 100/min, ridicabil prin
-`API_MAX_RPM`), iar un 429 blochează tot procesul până expiră `ratelimit-reset`.
+`src/lib/rateLimiter.js` ține un token bucket (`API_MAX_RPM`, implicit 100), iar
+un 429 blochează tot procesul până expiră `ratelimit-reset`. Pe cheie admin
+poate urca la 1000+ — plafonul serverului e 6000/min.
+
+Atenție: limitarea per cheie a fost reparată în spec 087. Înainte, limiterul
+rula *înaintea* autentificării, deci „120/min/cheie" era de fapt 120/min/IP.
 
 `limit` la `/matches` e plafonat la **50** pe chei normale și **500** pe conturi
 admin — `listMatches` paginează automat oricum.
