@@ -6,7 +6,7 @@
  *   GET /matches/{slug}                   — meci
  *   GET /matches/{slug}/models            — Poisson, Dixon-Coles, Elo, Glicko2, ensemble
  *   GET /matches/{slug}/context           — H2H, formă, statistici sezon
- *   GET /matches/{slug}/bot-predictions   — predicțiile boților + consensus
+ *   GET /matches/{slug}/bots              — predicțiile boților PredictCamp
  *   GET /matches/{slug}/ml-1x2            — probabilități ML calibrate
  *   GET /bots                             — catalogul de boți
  */
@@ -87,8 +87,9 @@ export async function getMatchContext(slug) {
   return request(`/matches/${encodeURIComponent(slug)}/context`);
 }
 
+/** Calea corectă e /bots — /bot-predictions nu există în spec (întorcea 500). */
 export async function getBotPredictions(slug) {
-  return request(`/matches/${encodeURIComponent(slug)}/bot-predictions`);
+  return request(`/matches/${encodeURIComponent(slug)}/bots`);
 }
 
 export async function getMl1x2(slug) {

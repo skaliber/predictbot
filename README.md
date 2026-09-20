@@ -22,7 +22,7 @@ care ajung la concluzii diferite pe același meci — fiecare cu reasoning expli
                 │
 ┌───────────────▼─────────────────────────┐
 │  PredictCamp API  /api/public/v1        │
-│  /models · /context · /bot-predictions  │
+│  /models · /context · /bots · /ml-1x2   │
 └─────────────────────────────────────────┘
 ```
 

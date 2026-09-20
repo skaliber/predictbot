@@ -56,3 +56,25 @@ test('toApiDate produce YYYY-MM-DD (API-ul respinge ISO 8601 complet)', () => {
   assert.equal(toApiDate(Date.UTC(2026, 0, 1)), '2026-01-01');
   assert.throws(() => toApiDate('nu e o dată'), /dată invalidă/);
 });
+
+test('endpoint-urile PredictCamp folosesc căile din OpenAPI', async () => {
+  // Regresie: /bot-predictions nu există în spec (întorcea 500), calea e /bots.
+  const calls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    calls.push(new URL(url).pathname);
+    return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  try {
+    const { getBotPredictions, getMatchModels, getMatchContext, getMl1x2 } = await import('../src/dataFetcher.js');
+    await getBotPredictions('a-vs-b');
+    await getMatchModels('a-vs-b');
+    await getMatchContext('a-vs-b');
+    await getMl1x2('a-vs-b');
+  } finally { globalThis.fetch = realFetch; }
+  assert.ok(calls[0].endsWith('/matches/a-vs-b/bots'), calls[0]);
+  assert.ok(!calls.some((c) => c.includes('bot-predictions')), 'nicio cale /bot-predictions');
+  assert.ok(calls[1].endsWith('/matches/a-vs-b/models'));
+  assert.ok(calls[2].endsWith('/matches/a-vs-b/context'));
+  assert.ok(calls[3].endsWith('/matches/a-vs-b/ml-1x2'));
+});

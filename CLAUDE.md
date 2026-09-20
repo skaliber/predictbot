@@ -35,8 +35,8 @@ locale: `X-Locale: ro` · rate limit: 120 req/min pe endpoint-urile de date.
 | `GET /matches` | listă + `consensus`, `ensemble_prediction`, `bot_agreement_pct` | filtre `status`, `league`, `from`, `to`, `page`, `limit` |
 | `GET /matches/{slug}/models` | `poisson`, `elitul.dixon_coles`, `elitul.monte_carlo`, `elo`, `glicko2`, `ensemble`, `models_consensus` | **doar înainte de start**; după meci → `422 MODELS_NOT_AVAILABLE` |
 | `GET /matches/{slug}/context` | H2H (ultimele 10), formă (ultimele 5/echipă), statistici sezon | cache 1h; `form_order: newest_first` |
-| `GET /matches/{slug}/bot-predictions` | predicțiile boților PredictCamp + consensus | opțional pentru bot |
-| `GET /matches/{slug}/ml-1x2` | probabilități ML calibrate | opțional |
+| `GET /matches/{slug}/bots` | predicțiile boților PredictCamp | **nu** `/bot-predictions` — calea aia nu există (500) |
+| `GET /matches/{slug}/ml-1x2` | probabilități ML calibrate | 404 pe ligile fără model antrenat — se degradează grațios |
 | `GET /bots` | catalogul de boți PredictCamp | — |
 
 **Probabilitățile din API sunt procente (0–100).** Intern lucrăm cu fracții (0–1);
