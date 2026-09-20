@@ -32,7 +32,7 @@ locale: `X-Locale: ro` · rate limit: 120 req/min pe endpoint-urile de date.
 
 | Endpoint | Ce întoarce | Capcane |
 |---|---|---|
-| `GET /matches` | listă + `consensus`, `ensemble_prediction`, `bot_agreement_pct` | filtre `status`, `league`, `from`, `to`, `page`, `limit` |
+| `GET /matches` | listă + `consensus`, `ensemble_prediction`, `bot_agreement_pct` | **`limit` max 50** (peste → 400); `from`/`to` doar `YYYY-MM-DD`. `listMatches` paginează automat |
 | `GET /matches/{slug}/models` | `poisson`, `elitul.dixon_coles`, `elitul.monte_carlo`, `elo`, `glicko2`, `ensemble`, `models_consensus` | **doar înainte de start**; după meci → `422 MODELS_NOT_AVAILABLE` |
 | `GET /matches/{slug}/context` | H2H (ultimele 10), formă (ultimele 5/echipă), statistici sezon | cache 1h; `form_order: newest_first` |
 | `GET /matches/{slug}/bots` | predicțiile boților PredictCamp | **nu** `/bot-predictions` — calea aia nu există (500) |

@@ -70,9 +70,37 @@ async function request(path, { base, query, headers = {}, retries = config.api.r
 
 /* ---------- PredictCamp ---------- */
 
-export async function listMatches({ status, league, from, to, page = 1, limit = 50 } = {}) {
+/** Limita maximă acceptată de API pentru o pagină. */
+export const MAX_PAGE_LIMIT = 50;
+
+/** O singură pagină. Întoarce și metadatele de paginare. */
+export async function listMatchesPage({ status, league, from, to, page = 1, limit = MAX_PAGE_LIMIT } = {}) {
+  if (limit > MAX_PAGE_LIMIT) throw new RangeError(`limit maxim ${MAX_PAGE_LIMIT}, primit ${limit}`);
   const body = await request('/matches', { query: { status, league, from, to, page, limit } });
-  return body?.matches ?? body?.data ?? [];
+  return {
+    matches: body?.matches ?? body?.data ?? [],
+    pagination: body?.pagination ?? null,
+  };
+}
+
+/**
+ * Listă de meciuri, cu paginare automată — API-ul refuză limit > 50, deci un
+ * `limit` mai mare se traduce în mai multe cereri.
+ */
+export async function listMatches({ status, league, from, to, page, limit = MAX_PAGE_LIMIT } = {}) {
+  if (page !== undefined) {
+    return (await listMatchesPage({ status, league, from, to, page, limit: Math.min(limit, MAX_PAGE_LIMIT) })).matches;
+  }
+  const out = [];
+  for (let p = 1; out.length < limit; p++) {
+    const pageSize = Math.min(MAX_PAGE_LIMIT, limit - out.length);
+    const { matches, pagination } = await listMatchesPage({ status, league, from, to, page: p, limit: pageSize });
+    out.push(...matches);
+    if (!matches.length) break;
+    if (pagination && p >= pagination.pages) break;
+    if (!pagination && matches.length < pageSize) break;
+  }
+  return out.slice(0, limit);
 }
 
 export async function getMatch(slug) {
@@ -170,6 +198,6 @@ export async function getFootballDataFixtures({ competition, dateFrom, dateTo } 
 }
 
 export default {
-  toApiDate, listMatches, getMatch, getMatchModels, getMatchContext, getBotPredictions,
+  toApiDate, listMatches, listMatchesPage, MAX_PAGE_LIMIT, getMatch, getMatchModels, getMatchContext, getBotPredictions,
   getMl1x2, listBots, getUpcomingMatches, fetchMatchBundle, getFootballDataFixtures, ApiError,
 };

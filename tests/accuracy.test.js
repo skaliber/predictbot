@@ -78,3 +78,45 @@ test('endpoint-urile PredictCamp folosesc căile din OpenAPI', async () => {
   assert.ok(calls[2].endsWith('/matches/a-vs-b/context'));
   assert.ok(calls[3].endsWith('/matches/a-vs-b/ml-1x2'));
 });
+
+test('listMatches paginează când limit depășește maximul API-ului (50)', async () => {
+  const { listMatches, listMatchesPage, MAX_PAGE_LIMIT } = await import('../src/dataFetcher.js');
+  assert.equal(MAX_PAGE_LIMIT, 50);
+
+  const requested = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const u = new URL(url);
+    const page = Number(u.searchParams.get('page'));
+    const limit = Number(u.searchParams.get('limit'));
+    requested.push({ page, limit });
+    // API-ul real respinge limit > 50.
+    if (limit > 50) return new Response(JSON.stringify({ error: 'limit must be <= 50' }), { status: 400 });
+    const matches = Array.from({ length: limit }, (_, i) => ({ slug: `m-${page}-${i}` }));
+    return new Response(JSON.stringify({ matches, pagination: { page, limit, total: 120, pages: 3 } }), { status: 200 });
+  };
+  try {
+    const all = await listMatches({ status: 'TIMED', limit: 120 });
+    assert.equal(all.length, 120);
+    assert.deepEqual(requested.map((r) => r.limit), [50, 50, 20]);
+    assert.deepEqual(requested.map((r) => r.page), [1, 2, 3]);
+    assert.equal(new Set(all.map((m) => m.slug)).size, 120, 'fără duplicate între pagini');
+  } finally { globalThis.fetch = realFetch; }
+
+  await assert.rejects(() => listMatchesPage({ limit: 100 }), /limit maxim 50/);
+});
+
+test('listMatches se oprește când API-ul nu mai are pagini', async () => {
+  const { listMatches } = await import('../src/dataFetcher.js');
+  let calls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response(JSON.stringify({ matches: [{ slug: 'x' }], pagination: { page: 1, pages: 1, total: 1 } }), { status: 200 });
+  };
+  try {
+    const all = await listMatches({ limit: 200 });
+    assert.equal(all.length, 1);
+    assert.equal(calls, 1, 'nu insistă după ultima pagină');
+  } finally { globalThis.fetch = realFetch; }
+});
