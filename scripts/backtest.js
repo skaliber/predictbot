@@ -11,7 +11,8 @@
  *
  *   node scripts/backtest.js --limit=100 [--league=PL] [--refit]
  */
-import { listMatches } from '../src/dataFetcher.js';
+import { listMatches, getMatch, extractOdds } from '../src/dataFetcher.js';
+import { devig } from '../src/betting/odds.js';
 import { fitDixonColes, lambdasFromFit, predictDixonColes } from '../src/models/dixonColes.js';
 import { simulate } from '../src/models/monteCarlo.js';
 import { selectionHit } from '../src/lib/accuracy.js';
@@ -78,7 +79,7 @@ async function backtestStored({ limit }) {
  * `from`/`to` sunt OBLIGATORII în practică: fără ele, /matches aplică o fereastră
  * implicită îngustă și întoarce o mână de meciuri, nu istoricul.
  */
-async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrainArg }) {
+async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrainArg, withMarket = false }) {
   if (!from || !to) {
     throw new Error('backtestRefit: --from și --to sunt obligatorii (altfel API-ul întoarce doar fereastra recentă)');
   }
@@ -108,6 +109,12 @@ async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrain
   // deci nu poate fi o constantă — trebuie mediat pe rezultatele efective.
   const UNIFORM = [1 / 3, 1 / 3, 1 / 3];
   let uniformBrierSum = 0, uniformRpsSum = 0;
+  // Baseline „rata de bază": frecvențele 1/X/2 din setul de antrenare. E
+  // reperul naiv corect — uniform (1/3) e prea slab, nimeni nu prezice așa.
+  let baseRateRpsSum = 0, baseRateBrierSum = 0;
+  // Piața: cotele istorice de-vigate. Reperul real pentru pariuri.
+  let marketN = 0, marketRpsSum = 0, marketBrierSum = 0;
+  let modelRpsOnMarketSet = 0, modelBrierOnMarketSet = 0, marketWins = 0, modelWinsOnMarketSet = 0;
   for (let i = minTrain; i < usable.length && n < limit; i++) {
     const train = usable.slice(0, i);
     const target = usable[i];
@@ -121,6 +128,13 @@ async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrain
     const probs = [sim.home_win, sim.draw, sim.away_win];
     const outcome = target.homeGoals > target.awayGoals ? '1'
       : target.homeGoals === target.awayGoals ? 'X' : '2';
+    // Rata de bază se calculează DOAR din trecut, ca să nu existe leakage.
+    let bh = 0, bd = 0;
+    for (const m of train) {
+      if (m.homeGoals > m.awayGoals) bh++; else if (m.homeGoals === m.awayGoals) bd++;
+    }
+    const baseRate = [bh / train.length, bd / train.length, 1 - bh / train.length - bd / train.length];
+
     const picked = ['1', 'X', '2'][probs.indexOf(Math.max(...probs))];
     if (picked === outcome) wins++;
     if (outcome === '1') homeAlways++;
@@ -129,7 +143,27 @@ async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrain
     rpsSum += rps(probs, outcome);
     uniformBrierSum += brier(UNIFORM, outcome);
     uniformRpsSum += rps(UNIFORM, outcome);
+    baseRateBrierSum += brier(baseRate, outcome);
+    baseRateRpsSum += rps(baseRate, outcome);
     n++;
+
+    if (withMarket) {
+      try {
+        const full = await getMatch(target.slug);
+        const od = extractOdds(full);
+        if (od) {
+          const fair = devig(od.odds['1x2'], { method: 'shin' }).fair_probabilities;
+          marketRpsSum += rps(fair, outcome);
+          marketBrierSum += brier(fair, outcome);
+          modelRpsOnMarketSet += rps(probs, outcome);
+          modelBrierOnMarketSet += brier(probs, outcome);
+          const marketPick = ['1', 'X', '2'][fair.indexOf(Math.max(...fair))];
+          if (marketPick === outcome) marketWins++;
+          if (picked === outcome) modelWinsOnMarketSet++;
+          marketN++;
+        }
+      } catch { /* meci fără cote istorice — se sare */ }
+    }
   }
 
   if (!n) { console.log('Niciun meci evaluabil.'); return; }
@@ -143,8 +177,31 @@ async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrain
   console.log('');
   console.log(`Brier model:    ${(brierSum / n).toFixed(4)}   (uniform: ${uniformBrier.toFixed(4)}; mai mic = mai bun)`);
   console.log(`RPS model:      ${(rpsSum / n).toFixed(4)}   (uniform: ${uniformRps.toFixed(4)}; mai mic = mai bun)`);
-  const rpsGain = ((uniformRps - rpsSum / n) / uniformRps) * 100;
-  console.log(`Câștig RPS vs uniform: ${rpsGain.toFixed(1)}%`);
+  const baseRateRps = baseRateRpsSum / n;
+  const baseRateBrier = baseRateBrierSum / n;
+  console.log(`Brier rată de bază: ${baseRateBrier.toFixed(4)}`);
+  console.log(`RPS   rată de bază: ${baseRateRps.toFixed(4)}   ← reperul naiv corect`);
+  console.log('');
+  const gainUniform = ((uniformRps - rpsSum / n) / uniformRps) * 100;
+  const gainBase = ((baseRateRps - rpsSum / n) / baseRateRps) * 100;
+  console.log(`Câștig RPS vs uniform:      ${gainUniform.toFixed(1)}%`);
+  console.log(`Câștig RPS vs rată de bază: ${gainBase.toFixed(1)}%   ← cifra care contează`);
+
+  if (withMarket && marketN > 0) {
+    console.log('');
+    console.log(`--- vs PIAȚĂ (${marketN} meciuri cu cote istorice de-vigate) ---`);
+    const mRps = marketRpsSum / marketN, mBrier = marketBrierSum / marketN;
+    const modRps = modelRpsOnMarketSet / marketN, modBrier = modelBrierOnMarketSet / marketN;
+    console.log(`RPS   model ${modRps.toFixed(4)}  vs  piață ${mRps.toFixed(4)}`);
+    console.log(`Brier model ${modBrier.toFixed(4)}  vs  piață ${mBrier.toFixed(4)}`);
+    console.log(`Acuratețe model ${((modelWinsOnMarketSet / marketN) * 100).toFixed(1)}%  vs  piață ${((marketWins / marketN) * 100).toFixed(1)}%`);
+    const delta = ((mRps - modRps) / mRps) * 100;
+    console.log(delta > 0
+      ? `Modelul e cu ${delta.toFixed(1)}% MAI BUN decât piața (suspect — verifică dacă cotele sunt pre-kickoff)`
+      : `Modelul e cu ${Math.abs(delta).toFixed(1)}% mai slab decât piața (normal)`);
+  } else if (withMarket) {
+    console.log('\nNiciun meci din set n-a avut cote istorice.');
+  }
 }
 
 export { brier, rps, backtestStored, backtestRefit };
@@ -154,7 +211,11 @@ if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   const args = parseArgs();
   const limit = args.limit ? Number(args.limit) : 200;
   (args.refit
-    ? backtestRefit({ limit, league: args.league, from: args.from, to: args.to, minTrain: args['min-train'] ? Number(args['min-train']) : undefined })
+    ? backtestRefit({
+        limit, league: args.league, from: args.from, to: args.to,
+        minTrain: args['min-train'] ? Number(args['min-train']) : undefined,
+        withMarket: Boolean(args.market),
+      })
     : backtestStored({ limit }))
     .catch((err) => { console.error('Backtest eșuat:', err.message); process.exitCode = 1; });
 }
