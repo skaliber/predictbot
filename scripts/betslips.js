@@ -35,8 +35,9 @@ function sieveMarkdown(sv, total) {
   if (!sv.play.length) { L.push('> Niciun meci peste prag azi.'); return L.join('\n'); }
   L.push('| # | Meci | Ligă | Ora | Pick | Șansă | Cotă corectă | Cota ta | Sursă | Notă |');
   L.push('|---|---|---|---|---|---|---|---|---|---|');
-  sv.play.forEach((c, i) => {
-    const s = c.sieve;
+  // În raport, câmpurile sitei sunt aplatizate direct pe obiect.
+  sv.play.forEach((s, i) => {
+    const c = s;
     const k = { '1': 0, X: 1, '2': 2 }[s.pick];
     const mine = c.market_odds?.[k];
     L.push(`| ${i + 1} | ${c.match.home} – ${c.match.away} | ${c.match.league} | ${ro(c.match.kickoff)} | **${s.pick}** | ` +
@@ -53,7 +54,7 @@ function sieveMarkdown(sv, total) {
     L.push('');
     L.push(`<details><summary>Lasă (${sv.leave.length})</summary>`);
     L.push('');
-    for (const c of sv.leave.slice(0, 20)) L.push(`- ${c.match.home} – ${c.match.away} (${c.match.league}): ${c.leaveReason}`);
+    for (const c of sv.leave.slice(0, 20)) L.push(`- ${c.match.home} – ${c.match.away} (${c.match.league}): ${c.reason}`);
     L.push('</details>');
   }
   return L.join('\n');
