@@ -5,3 +5,4 @@ data/predictions/*.json
 data/cache/
 *.log
 .DS_Store
+data/cache/

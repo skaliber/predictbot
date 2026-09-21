@@ -17,6 +17,7 @@
  *      node scripts/experiments.js --experiment=blend --train=PL,PD,SA --test=BL1,FL1
  */
 import { listMatches, extractOdds } from '../src/dataFetcher.js';
+import { cached } from '../src/lib/cache.js';
 import { replaySources } from '../src/bot/replay.js';
 import { blend } from '../src/models/ensemble.js';
 import { devig } from '../src/betting/odds.js';
@@ -36,7 +37,10 @@ const simulations = Number(args.simulations ?? 3000);
 
 /** Limita trebuie să acopere TOT intervalul: altfel primim un subset arbitrar. */
 async function load(league, from, to, limit = 3000) {
-  const rows = await listMatches({ status: 'FINISHED', league, from, to, limit });
+  const rows = await cached(
+    ['finished', league, from, to, limit],
+    () => listMatches({ status: 'FINISHED', league, from, to, limit })
+  );
   return rows
     .filter((m) => Number.isFinite(m.score_home) && Number.isFinite(m.score_away))
     .map((m) => ({

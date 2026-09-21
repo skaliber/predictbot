@@ -16,6 +16,7 @@
  * standard e departe de zero). Sub |t| = 2 nu se poate afirma nimic.
  */
 import { listMatches, extractOdds } from '../src/dataFetcher.js';
+import { cached } from '../src/lib/cache.js';
 import { flatRoi, margin, bucketRoi, bucketize } from '../src/lib/hypothesis.js';
 import { devig } from '../src/betting/odds.js';
 
@@ -37,7 +38,10 @@ const LEAGUES = (args.leagues ?? '77,76,446,PL,PD,SA,6,FL1,8,45,61,68,BL1,60,196
 const all = [];
 for (const league of LEAGUES) {
   try {
-    const rows = await listMatches({ status: 'FINISHED', league, from, to, limit: 4000 });
+    const rows = await cached(
+      ['finished', league, from, to],
+      () => listMatches({ status: 'FINISHED', league, from, to, limit: 4000 })
+    );
     let n = 0;
     for (const m of rows) {
       if (!Number.isFinite(m.score_home) || !Number.isFinite(m.score_away)) continue;
