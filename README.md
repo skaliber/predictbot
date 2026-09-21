@@ -105,6 +105,15 @@ GET  /api/bots/:botId/predict/:slug
 GET  /api/bots/:botId/history          → acuratețe, ROI Kelly, ROI flat, split pe piață
 ```
 
+## Cât de bun e, de fapt
+
+Backtest walk-forward pe 824 de meciuri, 5 ligi, sezonul 2025/26: **modelul e
+în urma pieței în toate ligile**, cu 1.8–7.6% pe RPS. Bate reperul naiv, dar
+nu bookmakerul — deci nu are edge sistematic. Cifre complete și metodologie
+în [BACKTEST.md](BACKTEST.md).
+
+Pragurile SAFE/MODERATE/RISKY **nu sunt încă validate pe date**.
+
 ## Evaluare
 
 ```bash

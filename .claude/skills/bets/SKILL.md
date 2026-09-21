@@ -93,6 +93,20 @@ absențele de lot. Menționează ce ai găsit, sau spune explicit că n-ai găsi
 - Fiecare zi e independentă statistic. **Nu** presupune că „acum e mai probabil
   să iasă" fiindcă a picat de două ori — asta e gambler's fallacy.
 
+## Cât de mult să te bazezi pe `edge`
+
+Backtest pe 824 de meciuri (vezi `BACKTEST.md`): modelul e în urma pieței în
+toate cele 5 ligi majore, cu 1.8–7.6% pe RPS. **Nu există edge sistematic.**
+
+Deci un `edge_pct` pozitiv e mai probabil eroare de model decât preț greșit.
+Prezintă-l ca „modelul nu e de acord cu piața aici", nu ca „am găsit value".
+Când edge-ul e mare (peste ~10pp), suspiciunea implicită ar trebui să fie că
+modelul greșește, nu piața — mai ales dacă apare și `SMALL_SAMPLE` sau
+`FALLBACK_ON_PICK`.
+
+Pragurile SAFE/MODERATE/RISKY nu sunt validate pe date. `SAFE` înseamnă
+„a trecut filtrele", nu „are șanse mari".
+
 ## Ce să NU faci
 
 - Nu recomanda un pick „safe" doar pe `ensemble_prediction` / `bot_agreement_pct`.
