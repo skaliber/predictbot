@@ -29,7 +29,8 @@
     "edge": "node scripts/edgeReport.js",
     "hypotheses": "node scripts/hypotheses.js",
     "ah": "node scripts/ahReport.js",
-    "combined": "node scripts/combinedReport.js"
+    "combined": "node scripts/combinedReport.js",
+    "stacking": "node scripts/stackingReport.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
