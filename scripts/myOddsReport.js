@@ -9,13 +9,17 @@
  *
  *  A. Fără selecție: cât de des cota ta depășește prețul corect Pinnacle la
  *     închidere. Fără look-ahead, fiindcă nu alegem nimic.
- *  B. Selecție FĂRĂ look-ahead (doar ligile cu Pinnacle la deschidere):
- *     pariezi când cota ta bate Pinnacle-ul de LA DESCHIDERE, care e
- *     disponibil înainte de meci. CLV măsurat real, față de închidere.
- *  C. Limită superioară (toate ligile, inclusiv Liga I): pariezi când cota ta
- *     bate Pinnacle-ul de LA ÎNCHIDERE. Asta folosește informație pe care n-o
- *     ai la momentul pariului — răspunde doar „cât valorează dacă ai avea
- *     linia sharp în timp real".
+ *  B. Momentul cotelor tale: sunt mai aproape de Pinnacle la deschidere sau la
+ *     închidere? Determină ce comparație e validă.
+ *  C. Același moment: cota ta vs Pinnacle LA ÎNCHIDERE. Valid fiindcă cotele
+ *     tale sunt capturate aproape de start (vezi B). Operațional însă cere
+ *     linia Pinnacle în timp real în momentul pariului.
+ *
+ * Istoric: o versiune anterioară compara cotele tale cu Pinnacle la
+ * DESCHIDERE, presupunând că „pre" = deschidere. Greșit — cotele tale sunt de
+ * la închidere, deci comparația măsura mișcarea liniei deja produsă și
+ * selecta exact rezultatele care pierduseră teren pe piață. Dădea ROI −14% cu
+ * CLV +4.3%, o contradicție care a trădat eroarea.
  *
  *   node scripts/myOddsReport.js
  */
@@ -153,10 +157,23 @@ const printRows = (title, rows, note) => {
   if (note) console.log(note);
 };
 
-printRows('B. FĂRĂ LOOK-AHEAD — cota ta vs Pinnacle LA DESCHIDERE (doar ligile principale)',
-  run('pinOpen'), 'CLV = cota ta față de prețul corect Pinnacle la închidere. Pozitiv = linia s-a mișcat în favoarea ta.');
-printRows('C. LIMITĂ SUPERIOARĂ — cota ta vs Pinnacle LA ÎNCHIDERE (toate ligile, inclusiv Liga I)',
-  run('pinClose'), '⚠ Folosește închiderea, pe care n-o știi când pariezi. Arată cât valorează o linie sharp în timp real,\n  nu un profit obtenabil acum.');
+/* B. când sunt capturate cotele tale? */
+const dist = (a, b) => a.reduce((s, x, i) => s + Math.abs(1 / x - 1 / b[i]), 0);
+let nearOpen = 0, nearClose = 0;
+for (const j of joined) {
+  if (!j.pinOpen) continue;
+  if (dist(j.mine, j.pinOpen) < dist(j.mine, j.pinClose)) nearOpen++; else nearClose++;
+}
+console.log(`\n${'═'.repeat(96)}`);
+console.log('B. CÂND SUNT CAPTURATE COTELE TALE?');
+console.log('═'.repeat(96));
+console.log(`Mai aproape de Pinnacle la închidere: ${nearClose}   la deschidere: ${nearOpen}`);
+console.log(nearClose > nearOpen
+  ? 'Cotele tale sunt de la închidere ⇒ comparația validă e cu Pinnacle la închidere (C), nu la deschidere.'
+  : 'Cotele tale sunt de la deschidere ⇒ comparația validă e cu Pinnacle la deschidere.');
+
+printRows('C. ACELAȘI MOMENT — cota ta vs Pinnacle LA ÎNCHIDERE (toate ligile)',
+  run('pinClose'), '⚠ Valid ca date. Operațional cere linia Pinnacle în timp real când pariezi — pe care n-o ai gratuit.');
 
 /* ---------- Liga I, separat ---------- */
 
@@ -175,6 +192,6 @@ if (ro.length) {
   console.log(`\nLiga I separat — ${ro.length} meciuri lipite, ${bets.length} rezultate unde cota ta bate Pinnacle la închidere:`);
   console.log(`  ROI ${f(v.bootstrap?.roi_pct)}%, interval [${f(v.bootstrap?.p05)}%, ${f(v.bootstrap?.p95)}%], ${v.verdict}` +
     (v.reasons.length ? ` (${v.reasons.join('; ')})` : ''));
-  console.log('  (limită superioară — același avertisment ca la C)');
+  console.log('  (același avertisment operațional ca la C)');
 }
 console.log();
