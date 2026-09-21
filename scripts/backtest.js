@@ -72,9 +72,17 @@ async function backtestStored({ limit }) {
   console.log(`ROI flat 1u: ${((profit / n) * 100).toFixed(1)}%`);
 }
 
-/** Backtest walk-forward: refit Dixon-Coles pe trecut, predicție pe meciul următor. */
-async function backtestRefit({ limit = 200, league }) {
-  const finished = await listMatches({ status: 'FINISHED', league, limit: Math.max(limit * 3, 300) });
+/**
+ * Backtest walk-forward: refit Dixon-Coles pe trecut, predicție pe meciul următor.
+ *
+ * `from`/`to` sunt OBLIGATORII în practică: fără ele, /matches aplică o fereastră
+ * implicită îngustă și întoarce o mână de meciuri, nu istoricul.
+ */
+async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrainArg }) {
+  if (!from || !to) {
+    throw new Error('backtestRefit: --from și --to sunt obligatorii (altfel API-ul întoarce doar fereastra recentă)');
+  }
+  const finished = await listMatches({ status: 'FINISHED', league, from, to, limit: Math.max(limit * 4, 600) });
   const usable = finished
     .filter((m) => Number.isFinite(m.score_home) && Number.isFinite(m.score_away))
     .map((m) => ({
@@ -85,13 +93,16 @@ async function backtestRefit({ limit = 200, league }) {
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   console.log(`Meciuri terminate disponibile: ${usable.length}`);
-  const minTrain = Math.max(60, Math.floor(usable.length * 0.5));
+  const minTrain = minTrainArg ?? Math.max(60, Math.floor(usable.length * 0.5));
   if (usable.length < minTrain + 10) {
     console.log('Prea puține meciuri pentru walk-forward. Mărește --limit sau scoate --league.');
     return;
   }
 
   let n = 0, wins = 0, brierSum = 0, rpsSum = 0;
+  // Baseline: „mereu gazdele" — cel mai simplu predictor posibil.
+  let homeAlways = 0;
+  const outcomes = { '1': 0, X: 0, '2': 0 };
   for (let i = minTrain; i < usable.length && n < limit; i++) {
     const train = usable.slice(0, i);
     const target = usable[i];
@@ -107,6 +118,8 @@ async function backtestRefit({ limit = 200, league }) {
       : target.homeGoals === target.awayGoals ? 'X' : '2';
     const picked = ['1', 'X', '2'][probs.indexOf(Math.max(...probs))];
     if (picked === outcome) wins++;
+    if (outcome === '1') homeAlways++;
+    outcomes[outcome]++;
     brierSum += brier(probs, outcome);
     rpsSum += rps(probs, outcome);
     n++;
@@ -114,9 +127,18 @@ async function backtestRefit({ limit = 200, league }) {
 
   if (!n) { console.log('Niciun meci evaluabil.'); return; }
   console.log(`\nWalk-forward pe ${n} meciuri (antrenare ≥ ${minTrain}):`);
-  console.log(`Acuratețe 1X2: ${((wins / n) * 100).toFixed(1)}%`);
-  console.log(`Brier:         ${(brierSum / n).toFixed(4)}`);
-  console.log(`RPS:           ${(rpsSum / n).toFixed(4)}`);
+  // Baseline uniform (1/3 fiecare) — reperul degenerat.
+  const uniformBrier = 2 / 3;
+  const uniformRps = (1 / 9 + 4 / 9) / 2;
+  console.log(`Distribuție reală: 1 ${outcomes['1']} / X ${outcomes.X} / 2 ${outcomes['2']}`);
+  console.log('');
+  console.log(`Acuratețe model:   ${((wins / n) * 100).toFixed(1)}%`);
+  console.log(`Acuratețe „mereu 1": ${((homeAlways / n) * 100).toFixed(1)}%  ← baseline de bătut`);
+  console.log('');
+  console.log(`Brier model:    ${(brierSum / n).toFixed(4)}   (uniform: ${uniformBrier.toFixed(4)}; mai mic = mai bun)`);
+  console.log(`RPS model:      ${(rpsSum / n).toFixed(4)}   (uniform: ${uniformRps.toFixed(4)}; mai mic = mai bun)`);
+  const rpsGain = ((uniformRps - rpsSum / n) / uniformRps) * 100;
+  console.log(`Câștig RPS vs uniform: ${rpsGain.toFixed(1)}%`);
 }
 
 export { brier, rps, backtestStored, backtestRefit };
@@ -125,6 +147,8 @@ export { brier, rps, backtestStored, backtestRefit };
 if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
   const args = parseArgs();
   const limit = args.limit ? Number(args.limit) : 200;
-  (args.refit ? backtestRefit({ limit, league: args.league }) : backtestStored({ limit }))
+  (args.refit
+    ? backtestRefit({ limit, league: args.league, from: args.from, to: args.to, minTrain: args['min-train'] ? Number(args['min-train']) : undefined })
+    : backtestStored({ limit }))
     .catch((err) => { console.error('Backtest eșuat:', err.message); process.exitCode = 1; });
 }
