@@ -4,6 +4,7 @@
  */
 import { fetchMatchBundle, getUpcomingMatches, getGranularStats } from '../dataFetcher.js';
 import { runBot } from './botLogic.js';
+import { sieveScore, rankSlate, slipProbability } from './sieve.js';
 import { devig } from '../betting/odds.js';
 import log from '../lib/log.js';
 import {
@@ -84,6 +85,12 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
     }
   }
 
+  // Sita: probabilitatea pieței de-vigată, modelul doar ca rezervă și context.
+  const market = bundle.market_odds?.['1x2'] ? devig(bundle.market_odds['1x2'], { method: 'shin' }).fair_probabilities : null;
+  const pr = analysis.probabilities;
+  const model = pr ? [pr.home_win_pct / 100, pr.draw_pct / 100, pr.away_win_pct / 100] : null;
+  const sieve = sieveScore({ market, model });
+
   const probPct = analysis.confidence;
   const edgePct = analysis.edge_pct;
   const tier = tierFor({ flags, probPct: probPct ?? 0, edgePct });
@@ -131,6 +138,10 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
     },
     flags,
     reasoning: analysis.reasoning,
+    sieve,
+    // Intrările reale ale sitei, ca recalcularea să nu confunde piața cu modelul.
+    sieve_inputs: { market, model },
+    market_odds: bundle.market_odds?.['1x2'] ?? null,
   };
 }
 
@@ -200,4 +211,21 @@ export function buildSlips(candidates, { legsPerSlip = STAKE.legsPerSlip, maxSli
   };
 }
 
-export default { analyseMatch, analyseSlate, buildSlips, STAKE };
+/**
+ * Sita peste slate: primele N meciuri după probabilitatea pieței, restul
+ * „lasă" cu motiv. Validat pe 320 de zile: top 4 ies în 80.5% din cazuri,
+ * primele 2 împreună în 71.3%, primele 3 în 56.3% (scripts/sieveReport.js).
+ */
+export function sieveSlate(candidates, { top = 4, minProb = 0.5 } = {}) {
+  const pool = candidates
+    .filter((c) => c.sieve && !c.flags?.some((f) => f.code === 'QUALIFYING_ROUND' || f.code === 'NO_ENSEMBLE'))
+    .map((c) => ({ ...c, market: c.sieve_inputs?.market ?? null, model: c.sieve_inputs?.model ?? null }));
+  const { play, leave } = rankSlate(pool, { top, minProb });
+  return {
+    play, leave,
+    slip2: play.length >= 2 ? slipProbability(play, 2) : null,
+    slip3: play.length >= 3 ? slipProbability(play, 3) : null,
+  };
+}
+
+export default { analyseMatch, analyseSlate, buildSlips, sieveSlate, STAKE };

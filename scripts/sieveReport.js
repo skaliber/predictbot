@@ -18,7 +18,7 @@ import { loadMainSeasons } from '../src/lib/footballData.js';
 import { replaySources } from '../src/bot/replay.js';
 import { blend } from '../src/models/ensemble.js';
 import { closingProbs } from '../src/lib/clv.js';
-import { anchoredProbs, rankSlate } from '../src/bot/sieve.js';
+import { rankSlate } from '../src/bot/sieve.js';
 
 const LEAGUES = (process.env.SIEVE_LEAGUES ?? 'E0,E1,SP1,I1,D1,F1,N1,P1,T1,B1,SC0').split(',');
 const SEASONS = ['2122', '2223', '2324', '2425'];
@@ -60,7 +60,15 @@ const SCHEMES = {
     .sort((a, b) => b.p[b.k] - a.p[a.k]).slice(0, TOP),
   'B. doar modelul': (ms) => ms.map((m) => ({ m, p: m.model, k: argmax(m.model) }))
     .sort((a, b) => b.p[b.k] - a.p[a.k]).slice(0, TOP),
-  'C. sita': (ms) => rankSlate(ms, { top: TOP, minProb: 0.5 }).play
+  // Varianta respinsă, păstrată ca referință: piață ajustată de model cu ±3pp.
+  'C. piață+model ±3pp': (ms) => ms.map((m) => {
+    const raw = m.market.map((x, i) => Math.max(0.001, x + Math.max(-0.03, Math.min(0.03, m.model[i] - x))));
+    const t = raw.reduce((a, b) => a + b, 0);
+    const p = raw.map((x) => x / t);
+    return { m, p, k: argmax(p) };
+  }).sort((a, b) => b.p[b.k] - a.p[a.k]).slice(0, TOP),
+  // Sita din producție: trebuie să coincidă cu A.
+  'D. sita (producție)': (ms) => rankSlate(ms, { top: TOP, minProb: 0.5 }).play
     .map((m) => ({ m, p: m.sieve.probs, k: argmax(m.sieve.probs) })),
 };
 

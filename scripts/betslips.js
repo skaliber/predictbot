@@ -6,7 +6,7 @@
  *   node scripts/betslips.js --hours=48 [--league=PL] [--legs=3] [--slips=2]
  *                            [--stake=50] [--min-tier=MODERATE] [--markdown]
  */
-import { analyseSlate, buildSlips, STAKE } from '../src/bot/betslips.js';
+import { analyseSlate, buildSlips, sieveSlate, STAKE } from '../src/bot/betslips.js';
 
 function parseArgs() {
   const a = { _: [] };
@@ -28,8 +28,43 @@ const ro = (d) => new Date(d).toLocaleString('ro-RO', {
   timeZone: 'Europe/Bucharest', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
 });
 
+function sieveMarkdown(sv, total) {
+  const L = [];
+  L.push(`## Sita — ${sv.play.length} din ${total} meciuri`);
+  L.push('');
+  if (!sv.play.length) { L.push('> Niciun meci peste prag azi.'); return L.join('\n'); }
+  L.push('| # | Meci | Ligă | Ora | Pick | Șansă | Cotă corectă | Cota ta | Sursă | Notă |');
+  L.push('|---|---|---|---|---|---|---|---|---|---|');
+  sv.play.forEach((c, i) => {
+    const s = c.sieve;
+    const k = { '1': 0, X: 1, '2': 2 }[s.pick];
+    const mine = c.market_odds?.[k];
+    L.push(`| ${i + 1} | ${c.match.home} – ${c.match.away} | ${c.match.league} | ${ro(c.match.kickoff)} | **${s.pick}** | ` +
+      `${(s.prob * 100).toFixed(0)}% | ${s.fairOdds.toFixed(2)} | ${mine ? mine.toFixed(2) : '—'} | ${s.source} | ${s.notes.join('; ') || '—'} |`);
+  });
+  L.push('');
+  const parts = [];
+  if (sv.slip2) parts.push(`primele 2 împreună: **${(sv.slip2 * 100).toFixed(0)}%**`);
+  if (sv.slip3) parts.push(`primele 3 împreună: **${(sv.slip3 * 100).toFixed(0)}%**`);
+  if (parts.length) L.push(`Șanse bilet — ${parts.join(' · ')}`);
+  L.push('');
+  L.push('_Validat pe 320 de zile: top 4 ies 80.5%, bilet de 2 → 71%, bilet de 3 → 56%. „Cota ta" sub „cota corectă" = casa plătește sub valoarea reală._');
+  if (sv.leave.length) {
+    L.push('');
+    L.push(`<details><summary>Lasă (${sv.leave.length})</summary>`);
+    L.push('');
+    for (const c of sv.leave.slice(0, 20)) L.push(`- ${c.match.home} – ${c.match.away} (${c.match.league}): ${c.leaveReason}`);
+    L.push('</details>');
+  }
+  return L.join('\n');
+}
+
 function markdown(report) {
   const L = [];
+  L.push(sieveMarkdown(report.sieve, report.slate.analyzed));
+  L.push('');
+  L.push('---');
+  L.push('');
   L.push(`## Bilete — fereastră ${report.window.hours}h (${report.slate.analyzed} meciuri analizate)`);
   L.push('');
   if (!report.slips.length) {
@@ -71,6 +106,7 @@ function markdown(report) {
 
 const candidates = await analyseSlate({ hoursAhead, league: args.league, limit: Number(args.limit ?? 60) });
 const build = buildSlips(candidates, { legsPerSlip, maxSlips, stake, minTier });
+const sieve = sieveSlate(candidates, { top: Number(args.top ?? 4) });
 
 const report = {
   generated_at: new Date().toISOString(),
@@ -83,6 +119,11 @@ const report = {
     no_bet: candidates.filter((c) => !c.excluded && !c.pick).length,
   },
   stake_policy: { ...STAKE, per_slip_ron: stake, legs_per_slip: legsPerSlip, min_tier: minTier },
+  sieve: {
+    play: sieve.play.map((c) => ({ slug: c.slug, match: c.match, ...c.sieve, market_odds: c.market_odds })),
+    leave: sieve.leave.map((c) => ({ slug: c.slug, match: c.match, reason: c.leaveReason })),
+    slip2: sieve.slip2, slip3: sieve.slip3,
+  },
   slips: build.slips,
   build: { incomplete: build.incomplete, unused_candidates: build.unused_candidates },
   candidates: candidates.filter((c) => !c.excluded),

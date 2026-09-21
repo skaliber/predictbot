@@ -2,73 +2,48 @@
  * Sita: din ~40 de meciuri, scoate cele 3-4 cele mai apropiate de realitate,
  * și spune clar pe care să le lași.
  *
- * Nu caută „edge" față de piață — cercetarea a arătat că modelele nu-l au.
- * Caută pick-urile cu cea mai mare probabilitate reală de a ieși, ca timpul
- * petrecut apoi în chatbot și la presă să meargă pe candidații buni.
+ * VALIDAT (scripts/sieveReport.js, 320 de zile cu ~36 de meciuri, top 4/zi):
  *
- * Principii, din cercetare (RESEARCH.md):
- *  · Cea mai bună estimare a realității e cota pieței de-vigată — a bătut
- *    toate modelele testate. Modelul doar o ajustează, plafonat (±3 puncte),
- *    ca în lnmomo/Gambling.
- *  · Dezacordul model–piață e cel mai puternic semnal de „lasă": când modelele
- *    sunt de acord între ele dar contra pieței, pick-ul iese în 17.9% din cazuri.
+ *   metodă              au ieșit   bilet 2   bilet 3    ROI
+ *   doar piața            80.5%     71.3%     56.3%    +0.1%
+ *   doar modelul          77.1%     67.8%     51.9%    −1.2%
+ *   piață + model ±3pp    78.0%     70.0%     53.8%    −2.1%
+ *
+ * Deci ordonarea se face PUR după probabilitatea pieței. Ajustarea modelului,
+ * chiar plafonată la ±3 puncte, reordona clasamentul spre alegeri mai slabe.
+ * Iar filtrul de dezacord model–piață nu contează aici: în top 4 al pieței,
+ * modelul nu e de acord doar în 3 cazuri din 1.280.
+ *
+ * Modelul rămâne în două roluri: rezervă când lipsesc cotele, și context
+ * pentru pasul de chatbot/presă. Nu la ordonare.
  */
 
-/** Cât are voie modelul să mute probabilitatea pieței, în fracții. */
-export const RESIDUAL_CAP = Number(process.env.SIEVE_RESIDUAL_CAP ?? 0.03);
-
-const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-
-/**
- * Probabilitatea ancorată pe piață: piața + ajustarea modelului, plafonată,
- * apoi re-normalizată la sumă 1.
- *
- * Re-normalizarea contează: fără ea, trei ajustări independente pot „fabrica"
- * masă de probabilitate (suma > 1) și implicit EV fals — capcană documentată
- * în lnmomo/Gambling.
- */
-export function anchoredProbs(market, model, cap = RESIDUAL_CAP) {
-  if (!market) return model ? [...model] : null;
-  if (!model) return [...market];
-  const raw = market.map((m, i) => Math.max(0.001, m + clamp(model[i] - m, -cap, cap)));
-  const sum = raw.reduce((a, b) => a + b, 0);
-  return raw.map((p) => p / sum);
-}
-
-/** Indexul rezultatului cel mai probabil. */
-const argmax = (a) => a.indexOf(Math.max(...a));
 const OUT = ['1', 'X', '2'];
+const argmax = (a) => a.indexOf(Math.max(...a));
+
+/** Penalizarea când lipsesc cotele: probabilitatea din model e mai puțin precisă. */
+export const NO_ODDS_PENALTY = 8;
 
 /**
- * Scorul de sită pentru un meci. Mai mare = candidat mai bun.
- *
- * Pornește de la probabilitatea ancorată a pick-ului, apoi:
- *  · penalizare mare dacă modelul și piața aleg favoriți diferiți
- *  · bonus mic dacă sunt de acord (confirmare independentă)
- *  · penalizare fără cote: probabilitatea vine doar din model, mai puțin precisă
+ * Scorul de sită. Mai mare = candidat mai bun.
+ * Cu cote: probabilitatea pieței de-vigată, nemodificată.
+ * Fără cote: probabilitatea modelului, penalizată.
  */
 export function sieveScore({ market, model }) {
-  const p = anchoredProbs(market, model);
+  const p = market ?? model;
   if (!p) return null;
   const pick = argmax(p);
-  const reasons = [];
+  const notes = [];
   let score = p[pick] * 100;
 
   if (!market) {
-    score -= 8;
-    reasons.push('fără cote — probabilitate doar din model');
+    score -= NO_ODDS_PENALTY;
+    notes.push('fără cote — probabilitate doar din model, mai puțin precisă');
   } else if (model) {
-    const modelPick = argmax(model);
-    const marketPick = argmax(market);
-    if (modelPick !== marketPick) {
-      score -= 25;
-      reasons.push(`modelul zice „${OUT[modelPick]}", piața „${OUT[marketPick]}"`);
-    } else {
-      // Cât de strâns sunt de acord pe probabilitatea pick-ului.
-      const gap = Math.abs(model[pick] - market[pick]);
-      if (gap < 0.05) { score += 3; reasons.push('model și piață de acord'); }
-      else if (gap > 0.12) { score -= 6; reasons.push(`același pick, dar diferă cu ${(gap * 100).toFixed(0)} puncte`); }
-    }
+    // Informație pentru pasul următor, NU influențează ordonarea.
+    const mk = argmax(model);
+    if (mk !== pick) notes.push(`modelul ar alege „${OUT[mk]}" — verifică presa`);
+    else notes.push(`model de acord (${(model[pick] * 100).toFixed(0)}%)`);
   }
 
   return {
@@ -77,34 +52,34 @@ export function sieveScore({ market, model }) {
     prob: p[pick],
     probs: p,
     fairOdds: 1 / p[pick],
-    reasons,
+    source: market ? 'piață' : 'model',
+    notes,
   };
 }
 
 /**
  * Ordonează slate-ul și împarte în „joacă" (primele N) și „lasă".
- * Un pick sub `minProb` e lăsat indiferent de loc — nu completăm lista cu
- * candidați slabi doar ca să ajungem la N.
+ * Nu completează lista cu candidați sub `minProb`.
  */
 export function rankSlate(matches, { top = 4, minProb = 0.5 } = {}) {
-  const scored = matches
-    .map((m) => ({ ...m, sieve: sieveScore(m) }))
-    .filter((m) => m.sieve);
+  const scored = matches.map((m) => ({ ...m, sieve: sieveScore(m) })).filter((m) => m.sieve);
   scored.sort((a, b) => b.sieve.score - a.sieve.score);
-
   const play = [], leave = [];
   for (const m of scored) {
-    const weak = m.sieve.prob < minProb;
-    const conflict = m.sieve.reasons.some((r) => r.startsWith('modelul zice'));
-    if (play.length < top && !weak && !conflict) play.push(m);
+    if (play.length < top && m.sieve.prob >= minProb) play.push(m);
     else {
-      m.leaveReason = conflict ? m.sieve.reasons[0]
-        : weak ? `probabilitate ${(m.sieve.prob * 100).toFixed(0)}% sub prag`
-        : 'în afara primelor candidați';
+      m.leaveReason = m.sieve.prob < minProb
+        ? `probabilitate ${(m.sieve.prob * 100).toFixed(0)}% sub prag`
+        : 'în afara primilor candidați';
       leave.push(m);
     }
   }
   return { play, leave };
 }
 
-export default { anchoredProbs, sieveScore, rankSlate, RESIDUAL_CAP };
+/** Șansa ca primele n pick-uri să iasă împreună (independență asumată). */
+export function slipProbability(picks, n) {
+  return picks.slice(0, n).reduce((acc, m) => acc * m.sieve.prob, 1);
+}
+
+export default { sieveScore, rankSlate, slipProbability, NO_ODDS_PENALTY };

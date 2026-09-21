@@ -16,6 +16,12 @@ license: MIT
 înainte de pariu — nu un generator de „predicții". Onestitate directă când
 datele sunt insuficiente sau contradictorii. Nu forța o narațiune „safe".
 
+## Scopul
+
+Sita, nu predicția. Din ~40 de meciuri, `/bets` scoate cele 3-4 cele mai
+apropiate de realitate și spune clar pe care să le lași. Utilizatorul le duce
+apoi în chatbot și verifică presa — **acolo e avantajul lui, nu în model.**
+
 ## Pasul 1 — rulează motorul
 
 ```bash
@@ -23,7 +29,30 @@ node scripts/betslips.js --hours=48 --legs=3 --slips=2 --stake=50
 ```
 
 Ieșirea e JSON pe stdout. Opțiuni: `--league=PL`, `--min-tier=SAFE`,
-`--markdown` (tabele gata făcute, util pentru un răspuns rapid).
+`--top=4`, `--markdown` (tabele gata făcute, util pentru un răspuns rapid).
+
+**Secțiunea `sieve` e rezultatul principal.** Prezint-o prima.
+
+### Cum ordonează sita — validat
+
+Pur după **probabilitatea pieței de-vigată**. Pe 320 de zile cu ~36 de meciuri,
+top 4/zi:
+
+| metodă | au ieșit | bilet 2 | bilet 3 | ROI |
+|---|---|---|---|---|
+| **doar piața** | **80.5%** | **71.3%** | **56.3%** | **+0.1%** |
+| doar modelul | 77.1% | 67.8% | 51.9% | −1.2% |
+| piață + model ±3pp | 78.0% | 70.0% | 53.8% | −2.1% |
+
+Modelul NU reordonează — orice ajustare a lui a ales pick-uri mai slabe. Rămâne
+ca rezervă unde lipsesc cotele (sursa „model", mai puțin precisă) și ca notă
+de context: „modelul ar alege altceva — verifică presa".
+
+ROI-ul sitei e ~0: îți dă candidați la preț corect, nu avantaj. **Avantajul
+vine din pasul tău de presă și chatbot.** Spune asta, nu promite profit.
+
+Coloana „cota ta" vs „cota corectă": dacă cota casei e sub cota corectă, casa
+plătește sub valoarea reală — merită semnalat.
 
 Motorul face deja, determinist, pașii obligatorii de workflow:
 paginare peste slate, filtrare `ensemble_prediction`, excluderea rundelor de
@@ -82,6 +111,10 @@ Dacă un pick are `CONSENSUS_VS_MARKET`, `GRANULAR_CONTRADICTS`, sau tier
 absențele de lot. Menționează ce ai găsit, sau spune explicit că n-ai găsit nimic.
 
 ## Pasul 4 — prezintă
+
+**Întâi sita** (tabelul `sieve.play`, șansele de bilet `slip2`/`slip3`, lista
+„lasă"). Abia apoi, dacă e relevant, biletele din `slips`.
+
 
 - **Tabele separate, numerotate** (Tabel 1, Tabel 2) — nu un tabel combinat.
 - Coloane: Meci · Ligă · Ora · Pick · Cotă · Model % · Edge · Tier · Susținere.
