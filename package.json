@@ -25,7 +25,9 @@
     "validate:tiers": "node scripts/validateTiers.js",
     "validate:bots": "node scripts/validatePersonalities.js",
     "validate:granular": "node scripts/validateGranular.js",
-    "optimize:weights": "node scripts/optimizeWeights.js"
+    "optimize:weights": "node scripts/optimizeWeights.js",
+    "edge": "node scripts/edgeReport.js",
+    "hypotheses": "node scripts/hypotheses.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
