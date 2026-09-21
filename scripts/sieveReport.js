@@ -93,5 +93,19 @@ for (const [name, pickFn] of Object.entries(SCHEMES)) {
   );
 }
 console.log('─'.repeat(100));
+
+// Merită dezacordul modelului afișat ca AVERTISMENT peste pick-urile pieței?
+// Contează doar dacă pick-ul pieței iese mai rar când modelul nu e de acord.
+const agree = { n: 0, w: 0 }, disagree = { n: 0, w: 0 };
+for (const [, ms] of days) {
+  for (const { m, k } of SCHEMES['A. doar piața'](ms)) {
+    const g = argmax(m.model) === k ? agree : disagree;
+    g.n++; if (m.outcome === OUT[k]) g.w++;
+  }
+}
+const pr = (g) => (g.n ? `${(g.w / g.n * 100).toFixed(1)}% din ${g.n}` : '—');
+console.log(`\nPick-urile pieței (top ${TOP}/zi), după acordul modelului:`);
+console.log(`  modelul e de acord:     ${pr(agree)}`);
+console.log(`  modelul NU e de acord:  ${pr(disagree)}`);
 console.log('„declarat" = probabilitatea pe care o dădea metoda. „diferență" = cât de onestă a fost (0 = perfect).');
 console.log('„bilet 2/3" = cât de des au ieșit ÎMPREUNĂ primele 2, respectiv 3 pick-uri ale zilei.\n');
