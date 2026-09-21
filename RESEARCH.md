@@ -343,3 +343,51 @@ linia sharp. Edge-ul nu e în predicție, e în alegerea prețului.
 
 Rezultatul dovedește că edge-ul există în prețuri. Nu dovedește cât din el
 poate fi extras.
+
+---
+
+# Cotele din PredictCamp vs Pinnacle
+
+Cotele tale (livescore, câmpul `raw_odds.pre`) lipite cu Pinnacle din
+football-data.co.uk. 21.649 de meciuri lipite pe 16 ligi, cu scor identic ca
+verificare. `node scripts/myOddsReport.js`.
+
+## Ce sunt cotele tale
+
+- **O singură casă, marjă 4.8–8.5%** — aproape dublu față de Pinnacle
+  (2.7–4.7%). Profil de casă „moale". Liga I are marja cea mai mare: 8.5%.
+- **Curate**: 8 din ~15.000 de meciuri au cote corupte (ex. Vitesse
+  301/10/1.06, probabil o cotă din timpul meciului salvată ca „pre"). Niciun
+  meci cu gazde/oaspeți inversate.
+- **Momentul capturii e inconsecvent**: 7.666 de meciuri sunt mai aproape de
+  Pinnacle la deschidere, 7.314 de închidere. Nu există un moment fix.
+
+## Rezultate
+
+| Test | n | ROI | Interval 95% | Verdict |
+|---|---|---|---|---|
+| Capturate devreme vs Pinnacle deschidere, EV ≥0% | 901 | −4.2% | [−13.1, +5.2] | FAIL |
+| Capturate devreme vs Pinnacle deschidere, EV ≥2% | 346 | −17.7% | [−32.2, −1.6] | FAIL |
+| Capturate târziu vs Pinnacle închidere, EV ≥0% | 1.024 | +8.0% | [−0.8, +17.2] | FAIL |
+| Capturate târziu vs Pinnacle închidere, EV ≥2% | 360 | +13.2% | [−3.8, +30.5] | FAIL |
+| Toate vs Pinnacle închidere, EV ≥6% (limită sup.) | 1.815 | +9.4% | [+2.4, +16.3] | PASS |
+| **Liga I**, orice EV vs Pinnacle închidere | 410 | +1.5% | [−9.3, +12.7] | FAIL |
+
+Singurul test complet fără look-ahead (devreme vs deschidere) e negativ: când
+cota ta pare mai bună decât linia Pinnacle de la deschidere, nu e valoare.
+
+Pe Liga I nu există edge: tot profitul vine din 5 pariuri, sign-flip p = 0.41.
+
+Rezultatul pozitiv (EV ≥6% față de închidere) e real ca date, dar cere linia
+Pinnacle **în momentul pariului** — pe care n-o ai gratuit.
+
+**Problema nu sunt cotele tale, ci referința.** Ai prețul casei. Nu ai prețul
+corect cu care să-l compari atunci când pariezi.
+
+## Două greșeli prinse pe parcurs
+
+1. Am presupus că „pre" = deschidere și am comparat cu Pinnacle la deschidere.
+   Pentru meciurile capturate târziu, asta măsura mișcarea liniei deja
+   produsă. Rezultat: ROI −14% cu CLV +4.3% — contradicția a trădat eroarea.
+2. Am dedus apoi că „pre" = închidere, doar din Premier League. Pe toate
+   ligile e aproape 50/50. Soluția: clasificare per meci și test separat.
