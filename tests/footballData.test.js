@@ -119,3 +119,24 @@ test('cheia de cache include versiunea schemei', async () => {
   assert.ok(/cached\(\[\s*'fd',\s*`v\$\{SCHEMA_VERSION\}`/.test(src),
     'cheile de cache trebuie să conțină versiunea schemei');
 });
+
+test('normalizeRow păstrează cotele fiecărei case separat', () => {
+  const r = normalizeRow({
+    Date: '16/08/2024', HomeTeam: 'A', AwayTeam: 'B', FTHG: '1', FTAG: '0',
+    B365H: '2.10', B365D: '3.40', B365A: '3.50',
+    B365CH: '2.05', B365CD: '3.50', B365CA: '3.60',
+    PSH: '2.12', PSD: '3.45', PSA: '3.55',
+    PSCH: '2.08', PSCD: '3.55', PSCA: '3.65',
+    MaxCH: '2.20', MaxCD: '3.70', MaxCA: '3.80',
+  }, { league: 'E0' });
+  assert.deepEqual(r.books.b365.open, [2.10, 3.40, 3.50]);
+  assert.deepEqual(r.books.b365.close, [2.05, 3.50, 3.60]);
+  assert.deepEqual(r.books.pinnacle.close, [2.08, 3.55, 3.65]);
+  assert.deepEqual(r.books.market_max.close, [2.20, 3.70, 3.80]);
+  assert.equal(r.books.market_avg.close, null, 'casă fără cote ⇒ null, nu set parțial');
+});
+
+test('versiunea schemei a crescut după adăugarea cotelor per casă', async () => {
+  const { SCHEMA_VERSION } = await import('../src/lib/footballData.js');
+  assert.ok(SCHEMA_VERSION >= 3, 'fără incrementare, cache-ul vechi ar servi rânduri fără `books`');
+});

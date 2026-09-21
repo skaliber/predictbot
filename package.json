@@ -31,7 +31,8 @@
     "ah": "node scripts/ahReport.js",
     "combined": "node scripts/combinedReport.js",
     "stacking": "node scripts/stackingReport.js",
-    "xg": "node scripts/xgReport.js"
+    "xg": "node scripts/xgReport.js",
+    "named-book": "node scripts/namedBookGap.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

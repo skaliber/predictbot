@@ -23,7 +23,7 @@ const BASE = 'https://www.football-data.co.uk';
  * arată ca „sursa nu are datele", nu ca o eroare. Crește-o la orice schimbare
  * de formă a rândului.
  */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /** CSV minimal: câmpuri între ghilimele, virgulă ca separator. */
 export function parseCsv(text) {
@@ -51,6 +51,12 @@ export function parseCsv(text) {
 const num = (v) => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : null;
+};
+
+/** Trei cote 1X2, sau null dacă oricare lipsește. */
+const trio = (h, d, a) => {
+  const o = [num(h), num(d), num(a)];
+  return o.every((x) => x > 1) ? o : null;
 };
 
 /** Datele vin ca DD/MM/YYYY sau DD/MM/YY. */
@@ -143,6 +149,16 @@ export function normalizeRow(r, { league, country }) {
     ahClosingOdds: ahClosing?.o ?? null,
     // BTTS nu are cote în sursă — doar rezultatul, pentru calibrare.
     btts: hg > 0 && ag > 0,
+    // Cotele PER CASĂ, separat. Pentru „named-book gap" trebuie să compari o
+    // casă anume cu consensul celorlalte — nu prima sursă disponibilă.
+    books: {
+      b365: { open: trio(r.B365H, r.B365D, r.B365A), close: trio(r.B365CH, r.B365CD, r.B365CA) },
+      pinnacle: { open: trio(r.PSH, r.PSD, r.PSA), close: trio(r.PSCH, r.PSCD, r.PSCA) },
+      market_avg: { open: trio(r.AvgH, r.AvgD, r.AvgA), close: trio(r.AvgCH, r.AvgCD, r.AvgCA) },
+      // Max = cea mai bună cotă dintre case. NU e executabilă ca atare (ar cere
+      // cont la toate casele, și include cote eronate) — doar limită superioară.
+      market_max: { open: trio(r.MaxH, r.MaxD, r.MaxA), close: trio(r.MaxCH, r.MaxCD, r.MaxCA) },
+    },
   };
 }
 
