@@ -34,8 +34,9 @@ const args = parseArgs();
 const WEIGHTS = personalities['ai-analyst'].weights;
 const simulations = Number(args.simulations ?? 3000);
 
-async function load(league, from, to) {
-  const rows = await listMatches({ status: 'FINISHED', league, from, to, limit: 800 });
+/** Limita trebuie să acopere TOT intervalul: altfel primim un subset arbitrar. */
+async function load(league, from, to, limit = 3000) {
+  const rows = await listMatches({ status: 'FINISHED', league, from, to, limit });
   return rows
     .filter((m) => Number.isFinite(m.score_home) && Number.isFinite(m.score_away))
     .map((m) => ({
