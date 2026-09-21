@@ -104,8 +104,24 @@ Când edge-ul e mare (peste ~10pp), suspiciunea implicită ar trebui să fie că
 modelul greșește, nu piața — mai ales dacă apare și `SMALL_SAMPLE` sau
 `FALLBACK_ON_PICK`.
 
-Pragurile SAFE/MODERATE/RISKY nu sunt validate pe date. `SAFE` înseamnă
-„a trecut filtrele", nu „are șanse mari".
+## Ce spun tier-urile, măsurat pe 912 meciuri
+
+| Tier | Rată reușită | IC 95% | ROI flat |
+|---|---|---|---|
+| SAFE | 71.0% (n=31) | 53.4–83.9% | −1.5% |
+| MODERATE | 63.5% (n=208) | 56.7–69.7% | −7.9% |
+| RISKY | 44.8% (n=645) | 41.0–48.7% | −6.8% |
+| EXCLUDED | 17.9% (n=28) | 7.9–35.6% | −34.6% |
+
+**MODERATE se separă real de RISKY** (intervale care nu se suprapun), iar
+regulile de excludere chiar identifică pick-uri proaste. **SAFE vs MODERATE nu
+se pot distinge încă** — n=31, intervalele se suprapun. Tratează-le la fel.
+
+**ROI negativ peste tot.** Tier-urile ordonează riscul corect, dar niciunul nu
+bate marja. Nu prezenta `SAFE` ca profitabil.
+
+`CONSENSUS_VS_MARKET` e cel mai puternic semnal măsurat (−32.3pp): când toate
+modelele sunt de acord împotriva pieței, piața are dreptate. E `exclude`.
 
 ## Ce să NU faci
 
