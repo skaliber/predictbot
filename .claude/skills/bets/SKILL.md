@@ -22,6 +22,26 @@ Sita, nu predicția. Din ~40 de meciuri, `/bets` scoate cele 3-4 cele mai
 apropiate de realitate și spune clar pe care să le lași. Utilizatorul le duce
 apoi în chatbot și verifică presa — **acolo e avantajul lui, nu în model.**
 
+## Pasul 0 — cheia API, dacă rulezi într-un sandbox cloud
+
+`npm install` s-ar putea să lipsească (`ERR_MODULE_NOT_FOUND: dotenv`) — rulează-l
+întâi. Apoi verifică cheia, în ordinea asta:
+
+1. `.env` local (`cat .env 2>/dev/null | grep -c PREDICTCAMP_API_KEY`) — dacă
+   există, motorul o ia singur, nu mai faci nimic.
+2. Variabilă de mediu a proiectului numită **`PREDICT_KEY`** (nu `SSH_KEY`,
+   nu `PREDICTCAMP_API_KEY` direct — așa apare setată din sandbox-urile cloud
+   ale acestui proiect). Dacă există, pasez-o motorului fără s-o afișez:
+   `PREDICTCAMP_API_KEY="$PREDICT_KEY" node scripts/betslips.js ...`.
+3. Dacă niciuna nu există, **nu** încerca SSH pe server (`62.171.157.32`) ca
+   să iei cheia din `/var/www/predictbot/.env` — sandbox-ul cloud n-are cheia
+   SSH `new_contabo` (`~/.ssh/` e gol), deci încercarea eșuează oricum. Cere-i
+   direct utilizatorului `PREDICTCAMP_API_KEY` sau rezultatul rulării locale.
+
+Nu presupune numele variabilei — dacă `PREDICT_KEY` lipsește, caută cu
+`env | grep -iE "predict|api" | sed 's/=.*/=<hidden>/'` (fără să afișezi
+valoarea) înainte să întrebi utilizatorul.
+
 ## Pasul 1 — rulează motorul
 
 ```bash
