@@ -95,6 +95,20 @@ export function normalizeRow(r, { league, country }) {
     { src: 'b365', o: [num(r['B365C>2.5']), num(r['B365C<2.5'])] },
   ].find((c) => c.o.every(Boolean));
 
+  // Asian Handicap: linia și cotele, de deschidere și de închidere.
+  const ahLineOpen = r.AHh === '' || r.AHh === undefined ? null : Number(r.AHh);
+  const ahLineClose = r.AHCh === '' || r.AHCh === undefined ? null : Number(r.AHCh);
+  const ahOpening = [
+    { src: 'pinnacle', o: [num(r.PAHH), num(r.PAHA)] },
+    { src: 'market_avg', o: [num(r.AvgAHH), num(r.AvgAHA)] },
+    { src: 'b365', o: [num(r.B365AHH), num(r.B365AHA)] },
+  ].find((c) => c.o.every(Boolean));
+  const ahClosing = [
+    { src: 'pinnacle', o: [num(r.PCAHH), num(r.PCAHA)] },
+    { src: 'market_avg', o: [num(r.AvgCAHH), num(r.AvgCAHA)] },
+    { src: 'b365', o: [num(r.B365CAHH), num(r.B365CAHA)] },
+  ].find((c) => c.o.every(Boolean));
+
   return {
     league: league ?? r.Div ?? r.League,
     country: country ?? r.Country ?? null,
@@ -113,6 +127,12 @@ export function normalizeRow(r, { league, country }) {
     ouClosingOdds: ouClosing?.o ?? null,
     ouClosingSource: ouClosing?.src ?? null,
     ouOpeningOdds: ouOpening?.o ?? null,
+    ahLineOpen: Number.isFinite(ahLineOpen) ? ahLineOpen : null,
+    ahLineClose: Number.isFinite(ahLineClose) ? ahLineClose : null,
+    ahOpeningOdds: ahOpening?.o ?? null,
+    ahClosingOdds: ahClosing?.o ?? null,
+    // BTTS nu are cote în sursă — doar rezultatul, pentru calibrare.
+    btts: hg > 0 && ag > 0,
   };
 }
 

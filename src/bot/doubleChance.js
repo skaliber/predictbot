@@ -19,6 +19,20 @@ export const ENABLED = process.env.ALLOW_DOUBLE_CHANCE_FALLBACK === 'true';
 
 export const WARNING = 'ROI măsurat −1.4% — nu e profitabil, doar mai puțin volatil decât 1X2.';
 
+/**
+ * Reducerea mizei când fallback-ul e activ. Nu e o optimizare de randament —
+ * un ROI negativ rămâne negativ indiferent de miză. E doar limitarea
+ * expunerii, pentru cazul în care flagul e pornit „pentru distracție".
+ */
+export const STAKE_REDUCTION = Number(process.env.DOUBLE_CHANCE_STAKE_REDUCTION ?? 0.5);
+
+/** Miza redusă pentru un pick convertit. */
+export function reducedStake(baseStake, reduction = STAKE_REDUCTION) {
+  if (!Number.isFinite(baseStake) || baseStake <= 0) return null;
+  const r = Number.isFinite(reduction) && reduction > 0 && reduction <= 1 ? reduction : 0.5;
+  return Math.round(baseStake * r * 10000) / 10000;
+}
+
 /** Perechea de dublă șansă pentru un pick, după partea mai puternică. */
 export function pairFor({ homeWinPct, awayWinPct }) {
   if (!Number.isFinite(homeWinPct) || !Number.isFinite(awayWinPct)) return null;
@@ -65,10 +79,14 @@ export function toDoubleChance({ pick, probs, odds1x2, enabled = ENABLED, minCon
     // discrepanță de preț de exploatat.
     edge_pct: null,
     ev_pct: null,
+    // Nu există edge, deci nu există miză Kelly. Dacă pick-ul original avea una,
+    // o păstrăm redusă, ca limitare de expunere — nu ca recomandare.
     kelly_stake: null,
+    suggested_stake_fraction: reducedStake(pick.kelly_stake),
+    stake_reduction: STAKE_REDUCTION,
     converted_from: { market: pick.market, selection: pick.selection, prob_pct: pick.model_prob_pct },
     warning: WARNING,
   };
 }
 
-export default { toDoubleChance, pairFor, pairProbability, ENABLED, MIN_CONFIDENCE, WARNING };
+export default { toDoubleChance, pairFor, pairProbability, reducedStake, ENABLED, MIN_CONFIDENCE, WARNING, STAKE_REDUCTION };

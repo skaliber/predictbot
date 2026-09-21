@@ -92,3 +92,23 @@ test('miza nu se schimbă prin conversie — fallback, nu strategie', () => {
   const dc = toDoubleChance({ pick: { ...pick1x2(66), kelly_stake: 0.04 }, probs, odds1x2: odds, enabled: true });
   assert.equal(dc.kelly_stake, null, 'nu se propagă o miză calculată pe alt pariu');
 });
+
+test('reducedStake limitează expunerea, fără să pretindă că îmbunătățește ceva', async () => {
+  const { reducedStake, STAKE_REDUCTION } = await import('../src/bot/doubleChance.js');
+  assert.equal(STAKE_REDUCTION, 0.5, 'implicit jumătate');
+  assert.equal(reducedStake(0.04), 0.02);
+  assert.equal(reducedStake(0.04, 0.25), 0.01);
+  assert.equal(reducedStake(0.04, 5), 0.02, 'reducere absurdă ⇒ cade pe 0.5');
+  assert.equal(reducedStake(0.04, -1), 0.02);
+  assert.equal(reducedStake(0), null);
+  assert.equal(reducedStake(null), null);
+});
+
+test('pick-ul convertit poartă miza redusă, nu pe cea originală', () => {
+  const dc = toDoubleChance({
+    pick: { ...pick1x2(66), kelly_stake: 0.04 }, probs, odds1x2: odds, enabled: true,
+  });
+  assert.equal(dc.kelly_stake, null, 'nu există Kelly fără edge');
+  assert.equal(dc.suggested_stake_fraction, 0.02, 'jumătate din miza originală');
+  assert.equal(dc.stake_reduction, 0.5);
+});

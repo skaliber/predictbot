@@ -27,7 +27,9 @@
     "validate:granular": "node scripts/validateGranular.js",
     "optimize:weights": "node scripts/optimizeWeights.js",
     "edge": "node scripts/edgeReport.js",
-    "hypotheses": "node scripts/hypotheses.js"
+    "hypotheses": "node scripts/hypotheses.js",
+    "ah": "node scripts/ahReport.js",
+    "combined": "node scripts/combinedReport.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
