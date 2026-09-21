@@ -302,3 +302,58 @@ test('runda de calificare e exclusă fără fetch', async () => {
     assert.equal(called, false);
   } finally { globalThis.fetch = realFetch; }
 });
+
+// ---- granular reconstruit din istoric (fără leakage) ----
+
+test('historicalGranular numără doar meciuri anterioare', async () => {
+  const { historicalGranular, altMarketOutcome } = await import('../src/bot/historicalGranular.js');
+  const hist = [];
+  // A joacă 8 meciuri cu multe goluri, B 8 cu puține.
+  for (let i = 0; i < 8; i++) {
+    hist.push({ home: 'A', away: `X${i}`, homeGoals: 3, awayGoals: 2, date: `2026-01-${String(i + 1).padStart(2, '0')}` });
+    hist.push({ home: 'B', away: `Y${i}`, homeGoals: 0, awayGoals: 1, date: `2026-01-${String(i + 1).padStart(2, '0')}` });
+  }
+  const g = historicalGranular(hist, 'A', 'B');
+  const over = g.prediction_summary.markets.find((m) => m.market === 'over_2_5');
+  // A: 8 meciuri cu 5 goluri (toate over), B: 8 cu 1 gol (niciunul) ⇒ 50%.
+  assert.equal(over.value_pct, 50);
+  assert.equal(over.sample_size, 16);
+  // Baseline-ul ligii e tot 50% (jumătate din toate meciurile sunt over).
+  assert.equal(over.league_baseline_pct, 50);
+  assert.equal(g._meta.home_sample, 8);
+});
+
+test('historicalGranular refuză eșantioane prea mici', async () => {
+  const { historicalGranular } = await import('../src/bot/historicalGranular.js');
+  const hist = [{ home: 'A', away: 'B', homeGoals: 1, awayGoals: 1, date: '2026-01-01' }];
+  assert.equal(historicalGranular(hist, 'A', 'B'), null);
+});
+
+test('historicalGranular se leagă de granularMarkets fără adaptor', async () => {
+  const { historicalGranular } = await import('../src/bot/historicalGranular.js');
+  const hist = [];
+  for (let i = 0; i < 10; i++) {
+    // Ambele echipe joacă meciuri cu multe goluri; liga în rest e seacă.
+    hist.push({ home: 'A', away: 'B', homeGoals: 3, awayGoals: 2, date: `2026-01-${String(i + 1).padStart(2, '0')}` });
+    for (let j = 0; j < 3; j++) {
+      hist.push({ home: `C${j}`, away: `D${j}`, homeGoals: 0, awayGoals: 0, date: `2026-01-${String(i + 1).padStart(2, '0')}` });
+    }
+  }
+  const g = historicalGranular(hist, 'A', 'B');
+  const m = granularMarkets(g, { minSample: 10, minDelta: 10 });
+  const over = m.find((x) => x.market === 'over_under');
+  assert.equal(over.selection, 'Over 2.5', 'echipele sunt peste baseline-ul ligii');
+  assert.ok(over.delta_vs_baseline > 50, `abatere mare față de o ligă seacă: ${over.delta_vs_baseline}`);
+});
+
+test('altMarketOutcome rezolvă corect fiecare piață', async () => {
+  const { altMarketOutcome } = await import('../src/bot/historicalGranular.js');
+  const m = (h, a) => ({ homeGoals: h, awayGoals: a });
+  assert.equal(altMarketOutcome(m(2, 1), 'Over 2.5'), true);
+  assert.equal(altMarketOutcome(m(1, 1), 'Over 2.5'), false);
+  assert.equal(altMarketOutcome(m(1, 1), 'Under 2.5'), true);
+  assert.equal(altMarketOutcome(m(1, 1), 'BTTS Yes'), true);
+  assert.equal(altMarketOutcome(m(3, 0), 'BTTS Yes'), false);
+  assert.equal(altMarketOutcome(m(3, 0), 'BTTS No'), true);
+  assert.equal(altMarketOutcome(m(1, 1), 'Handicap'), null);
+});
