@@ -17,7 +17,7 @@ import { fitDixonColes, lambdasFromFit, predictDixonColes } from '../src/models/
 import { buildRatings, predictElo } from '../src/models/elo.js';
 import { simulate } from '../src/models/monteCarlo.js';
 import { blend } from '../src/models/ensemble.js';
-import { closingProbs, clvPoints, logLoss, logLossBinary, sliceSummary } from '../src/lib/clv.js';
+import { closingProbs, clvPoints, clvOddsPct, logLoss, logLossBinary, sliceSummary } from '../src/lib/clv.js';
 
 function parseArgs() {
   const a = {};
@@ -65,45 +65,56 @@ function runLeague(rows, leagueLabel) {
     const history = rows.slice(Math.max(0, i - WINDOW), i);
     if (history.length < 200) continue;
 
-    if (!target.closingOdds && !target.ouClosingOdds) { skippedNoOdds++; continue; }
+    // CLV real cere ȘI deschidere, ȘI închidere: pariem la deschidere și
+    // măsurăm unde a închis piața. Fără deschidere nu există studiu de CLV.
+    const has1x2 = target.openingOdds && target.closingOdds;
+    const hasOu = target.ouOpeningOdds && target.ouClosingOdds;
+    if (!has1x2 && !hasOu) { skippedNoOdds++; continue; }
     const f = forecast(history, target, i);
     if (!f) continue;
     evaluated++;
 
-    // 1X2, pe cote de închidere de-vigate.
-    if (target.closingOdds) {
+    // 1X2: pariem la DESCHIDERE, comparăm cu ÎNCHIDEREA.
+    if (has1x2) {
+      const open = closingProbs(target.openingOdds);
       const close = closingProbs(target.closingOdds);
-      if (close) {
+      if (open && close) {
         const llModel = logLoss(f.x2, target.outcome);
         const llMarket = logLoss(close, target.outcome);
         ['1', 'X', '2'].forEach((sel, k) => {
           bets['1x2'].push({
             league: leagueLabel, selection: sel, date: target.date,
-            modelProb: f.x2[k], closingProb: close[k],
-            edge_pp: (f.x2[k] - close[k]) * 100,
-            odds: target.closingOdds[k],
+            modelProb: f.x2[k], openProb: open[k], closingProb: close[k],
+            // Selecția se face pe dezacordul cu prețul la care pariem.
+            edge_pp: (f.x2[k] - open[k]) * 100,
+            odds: target.openingOdds[k],
+            closeOdds: target.closingOdds[k],
             hit: target.outcome === sel,
-            clv: clvPoints({ modelProb: f.x2[k], closingProb: close[k] }),
+            clv: clvPoints({ openProb: open[k], closingProb: close[k] }),
+            clv_odds_pct: clvOddsPct({ openOdds: target.openingOdds[k], closeOdds: target.closingOdds[k] }),
             logLossModel: llModel, logLossMarket: llMarket,
           });
         });
       }
     }
 
-    // Over/Under 2.5, unde există cote de închidere pe piața asta.
-    if (target.ouClosingOdds) {
+    // Over/Under 2.5, la fel: deschidere pentru pariu, închidere pentru CLV.
+    if (hasOu) {
+      const open = closingProbs(target.ouOpeningOdds);
       const close = closingProbs(target.ouClosingOdds);
-      if (close) {
+      if (open && close) {
         const over = target.goals > 2.5;
         [['Over 2.5', f.over25, 0, over], ['Under 2.5', 1 - f.over25, 1, !over]]
           .forEach(([sel, p, k, hit]) => {
             bets.over25.push({
               league: leagueLabel, selection: sel, date: target.date,
-              modelProb: p, closingProb: close[k],
-              edge_pp: (p - close[k]) * 100,
-              odds: target.ouClosingOdds[k],
+              modelProb: p, openProb: open[k], closingProb: close[k],
+              edge_pp: (p - open[k]) * 100,
+              odds: target.ouOpeningOdds[k],
+              closeOdds: target.ouClosingOdds[k],
               hit,
-              clv: clvPoints({ modelProb: p, closingProb: close[k] }),
+              clv: clvPoints({ openProb: open[k], closingProb: close[k] }),
+              clv_odds_pct: clvOddsPct({ openOdds: target.ouOpeningOdds[k], closeOdds: target.ouClosingOdds[k] }),
               logLossModel: logLossBinary(f.over25, over),
               logLossMarket: logLossBinary(close[0], over),
             });
@@ -117,13 +128,13 @@ function runLeague(rows, leagueLabel) {
 /* ---------- încărcare ---------- */
 
 const leagues = [];
+// Ligile suplimentare (ROU/POL/AUT) au DOAR cote de închidere. Fără deschidere
+// nu există CLV măsurabil, deci nu pot intra într-un raport de edge — ar fi
+// exact greșeala de a numi „CLV" diferența model−închidere.
 for (const code of (args.leagues ?? '').split(',').filter(Boolean)) {
-  const rows = (await loadExtraLeague(code.trim()))
-    .filter((r) => r.closingOdds)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  if (rows.length) leagues.push({ label: code.trim(), rows });
-  console.error(`${code}: ${rows.length} meciuri cu cote de închidere`);
+  console.error(`${code.trim()}: sărit — sursa are doar cote de închidere, CLV nemăsurabil`);
 }
+
 const seasons = (args.seasons ?? '2122,2223,2324,2425').split(',').map((s) => s.trim());
 for (const code of (args.main ?? '').split(',').filter(Boolean)) {
   const rows = (await loadMainSeasons(code.trim(), seasons))

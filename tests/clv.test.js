@@ -12,10 +12,30 @@ test('closingProbs de-vighează și normalizează la 1', () => {
   assert.equal(closingProbs(null), null);
 });
 
-test('clvPoints măsoară diferența în puncte procentuale', () => {
-  close(clvPoints({ modelProb: 0.60, closingProb: 0.55 }), 5);
-  close(clvPoints({ modelProb: 0.50, closingProb: 0.55 }), -5);
-  assert.equal(clvPoints({ modelProb: NaN, closingProb: 0.5 }), null);
+test('clvPoints: linia care se mișcă spre tine dă CLV pozitiv', () => {
+  // Ai pariat la un preț care implica 40%; piața a închis la 45.5% ⇒ +5.5pp.
+  close(clvPoints({ openProb: 0.400, closingProb: 0.455 }), 5.5);
+  // Linia s-a mișcat împotriva ta.
+  close(clvPoints({ openProb: 0.500, closingProb: 0.450 }), -5);
+  assert.equal(clvPoints({ openProb: NaN, closingProb: 0.5 }), null);
+});
+
+test('clvOddsPct: cotă mai bună decât închiderea = CLV pozitiv', async () => {
+  const { clvOddsPct } = await import('../src/lib/clv.js');
+  close(clvOddsPct({ openOdds: 2.5, closeOdds: 2.2 }), 13.64, 0.05);
+  close(clvOddsPct({ openOdds: 2.0, closeOdds: 2.0 }), 0);
+  assert.ok(clvOddsPct({ openOdds: 1.9, closeOdds: 2.2 }) < 0);
+  assert.equal(clvOddsPct({ openOdds: 0.5, closeOdds: 2 }), null);
+});
+
+test('CLV nu trebuie confundat cu edge-ul de model', () => {
+  // Regresie: dacă filtrezi pariurile după „model − închidere ≥ prag" și apoi
+  // raportezi acea diferență drept CLV, e pozitivă prin construcție.
+  // CLV-ul corect nu depinde deloc de model.
+  const modelProb = 0.70, closingProb = 0.55, openProb = 0.56;
+  const realClv = clvPoints({ openProb, closingProb });
+  close(realClv, -1, 0.01);
+  assert.ok(realClv < 0, 'modelul vede +15pp edge, dar linia s-a mișcat contra');
 });
 
 test('logLoss penalizează predicția greșită', () => {

@@ -18,14 +18,25 @@ export function closingProbs(odds, method = 'shin') {
 }
 
 /**
- * CLV pentru un pariu: cu cât e mai mare probabilitatea modelului față de cea
- * de închidere, în puncte procentuale. Pozitiv = modelul a văzut valoare pe
- * care închiderea n-a confirmat-o... sau a greșit. Media pe multe pariuri
- * separă cele două.
+ * CLV real: ai pariat la cota de DESCHIDERE, iar piața a închis altundeva.
+ * Dacă linia s-a mișcat spre selecția ta, ai prins un preț mai bun decât
+ * consensul final — asta e edge, și converge mult mai repede decât ROI-ul.
+ *
+ *   CLV (pp) = prob_corectă_la_închidere − prob_corectă_la_prețul_tău
+ *
+ * ⚠️ NU compara probabilitatea MODELULUI cu închiderea și numi asta CLV:
+ * dacă selectezi pariurile după „model − închidere ≥ prag", atunci acea
+ * diferență e pozitivă prin construcție și nu măsoară nimic.
  */
-export function clvPoints({ modelProb, closingProb }) {
-  if (!Number.isFinite(modelProb) || !Number.isFinite(closingProb)) return null;
-  return (modelProb - closingProb) * 100;
+export function clvPoints({ openProb, closingProb }) {
+  if (!Number.isFinite(openProb) || !Number.isFinite(closingProb)) return null;
+  return (closingProb - openProb) * 100;
+}
+
+/** CLV în procente de cotă: cât de mult mai bun a fost prețul tău. */
+export function clvOddsPct({ openOdds, closeOdds }) {
+  if (!(openOdds > 1) || !(closeOdds > 1)) return null;
+  return (openOdds / closeOdds - 1) * 100;
 }
 
 /** Log-loss pentru o distribuție de probabilități față de rezultatul real. */
@@ -98,4 +109,4 @@ export function sliceSummary(bets, { minN = 200 } = {}) {
   };
 }
 
-export default { closingProbs, clvPoints, logLoss, logLossBinary, bootstrapRoi, sliceSummary };
+export default { closingProbs, clvPoints, clvOddsPct, logLoss, logLossBinary, bootstrapRoi, sliceSummary };

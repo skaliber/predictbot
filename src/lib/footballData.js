@@ -76,6 +76,19 @@ export function normalizeRow(r, { league, country }) {
     { src: 'b365', o: [num(r.B365CH), num(r.B365CD), num(r.B365CA)] },
   ].find((c) => c.o.every(Boolean));
 
+  // Cotele de DESCHIDERE — necesare pentru CLV real: pariezi la deschidere și
+  // vezi dacă linia s-a mișcat în favoarea ta până la închidere.
+  const opening = [
+    { src: 'pinnacle', o: [num(r.PSH), num(r.PSD), num(r.PSA)] },
+    { src: 'market_avg', o: [num(r.AvgH), num(r.AvgD), num(r.AvgA)] },
+    { src: 'b365', o: [num(r.B365H), num(r.B365D), num(r.B365A)] },
+  ].find((c) => c.o.every(Boolean));
+
+  const ouOpening = [
+    { src: 'market_avg', o: [num(r['Avg>2.5']), num(r['Avg<2.5'])] },
+    { src: 'b365', o: [num(r['B365>2.5']), num(r['B365<2.5'])] },
+  ].find((c) => c.o.every(Boolean));
+
   const ouClosing = [
     { src: 'pinnacle', o: [num(r['PC>2.5']), num(r['PC<2.5'])] },
     { src: 'market_avg', o: [num(r['AvgC>2.5']), num(r['AvgC<2.5'])] },
@@ -95,8 +108,11 @@ export function normalizeRow(r, { league, country }) {
     goals: hg + ag,
     closingOdds: closing?.o ?? null,
     closingSource: closing?.src ?? null,
+    openingOdds: opening?.o ?? null,
+    openingSource: opening?.src ?? null,
     ouClosingOdds: ouClosing?.o ?? null,
     ouClosingSource: ouClosing?.src ?? null,
+    ouOpeningOdds: ouOpening?.o ?? null,
   };
 }
 
