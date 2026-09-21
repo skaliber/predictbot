@@ -33,23 +33,32 @@ function sieveMarkdown(sv, total) {
   L.push(`## Sita — ${sv.play.length} din ${total} meciuri`);
   L.push('');
   if (!sv.play.length) { L.push('> Niciun meci peste prag azi.'); return L.join('\n'); }
-  L.push('| # | Meci | Ligă | Ora | Pick | Șansă | Cotă corectă | Cota ta | Sursă | Notă |');
-  L.push('|---|---|---|---|---|---|---|---|---|---|');
+  L.push('| # | Meci | Ligă | Ora | Pick | Șansă | Cotă corectă | Cota ta | Marja casei | Sursă | Notă |');
+  L.push('|---|---|---|---|---|---|---|---|---|---|---|');
   // În raport, câmpurile sitei sunt aplatizate direct pe obiect.
   sv.play.forEach((s, i) => {
     const c = s;
     const k = { '1': 0, X: 1, '2': 2 }[s.pick];
     const mine = c.market_odds?.[k];
+    // Cota corectă vine din ACELEAȘI cote, fără marjă — deci diferența e pur
+    // marja casei pe acel rezultat, nu un semnal de valoare.
+    const margin = mine ? ((s.fairOdds / mine - 1) * 100).toFixed(1) + '%' : '—';
     L.push(`| ${i + 1} | ${c.match.home} – ${c.match.away} | ${c.match.league} | ${ro(c.match.kickoff)} | **${s.pick}** | ` +
-      `${(s.prob * 100).toFixed(0)}% | ${s.fairOdds.toFixed(2)} | ${mine ? mine.toFixed(2) : '—'} | ${s.source} | ${s.notes.join('; ') || '—'} |`);
+      `${(s.prob * 100).toFixed(0)}% | ${s.fairOdds.toFixed(2)} | ${mine ? mine.toFixed(2) : '—'} | ${margin} | ${s.source} | ${s.notes.join('; ') || '—'} |`);
   });
   L.push('');
   const parts = [];
   if (sv.slip2) parts.push(`primele 2 împreună: **${(sv.slip2 * 100).toFixed(0)}%**`);
   if (sv.slip3) parts.push(`primele 3 împreună: **${(sv.slip3 * 100).toFixed(0)}%**`);
-  if (parts.length) L.push(`Șanse bilet — ${parts.join(' · ')}`);
+  if (parts.length) L.push(`**Șanse pentru biletele de azi** — ${parts.join(' · ')}`);
   L.push('');
-  L.push('_Validat pe 320 de zile: top 4 ies 80.5%, bilet de 2 → 71%, bilet de 3 → 56%. „Cota ta" sub „cota corectă" = casa plătește sub valoarea reală._');
+  const fromModel = sv.play.filter((c) => c.source === 'model').length;
+  L.push('_Reper istoric, pe zile de weekend cu favoriți puternici (~36 meciuri): top 4 ies 80.5%, ' +
+    'bilet de 2 → 71%, bilet de 3 → 56%. Cifrele de mai sus sunt ale meciurilor de azi — contează ele._');
+  if (fromModel) {
+    L.push(`_${fromModel} din ${sv.play.length} pick-uri n-au cote: probabilitatea e doar din model, validat mai slab (77% vs 80.5%)._`);
+  }
+  L.push('_„Marja casei" = cât sub valoarea reală plătește casa pe acel rezultat. Nu e un semnal — e costul pariului._');
   if (sv.leave.length) {
     L.push('');
     L.push(`<details><summary>Lasă (${sv.leave.length})</summary>`);
