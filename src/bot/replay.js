@@ -51,7 +51,12 @@ export function sampleFor(history, team) {
  * Un singur meci de test. `history` = meciurile strict anterioare, cronologic.
  * Întoarce null dacă modelul nu poate produce nimic (echipă nevăzută).
  */
-export function replayMatch({ history, target, personalityId = 'ai-analyst', simulations = 5000, seed = 1, xi = 0.0065 }) {
+/**
+ * Sursele de model pentru un meci, calculate din trecut. Partea scumpă
+ * (refit Dixon-Coles + Monte Carlo) se face o singură dată, ca optimizarea de
+ * ponderi să poată evalua mii de combinații fără să reantreneze nimic.
+ */
+export function replaySources({ history, target, simulations = 5000, seed = 1, xi = 0.0065 }) {
   let fit;
   try {
     fit = fitDixonColes(history, { referenceDate: target.date, xi });
@@ -61,8 +66,8 @@ export function replayMatch({ history, target, personalityId = 'ai-analyst', sim
   const dc = predictDixonColes({ fit, home: target.home, away: target.away });
   const mc = simulate(dc.matrix, { simulations, seed });
 
-  // Poisson „naiv": medii de goluri marcate/primite, fără forță comună.
   const sources = { dixonColes: dc, monteCarlo: mc };
+  // Poisson „naiv": medii de goluri marcate/primite, fără forță comună.
   const avg = averages(history, target.home, target.away);
   if (avg) sources.poisson = predictPoisson({ lambdaHome: avg.lambdaHome, lambdaAway: avg.lambdaAway });
 
@@ -70,12 +75,18 @@ export function replayMatch({ history, target, personalityId = 'ai-analyst', sim
   if (Number.isFinite(ratings[target.home]) && Number.isFinite(ratings[target.away])) {
     sources.elo = predictElo({ ratingHome: ratings[target.home], ratingAway: ratings[target.away] });
   }
+  return sources;
+}
+
+export function replayMatch({ history, target, personalityId = 'ai-analyst', simulations = 5000, seed = 1, xi = 0.0065, sources: precomputed }) {
+  const sources = precomputed ?? replaySources({ history, target, simulations, seed, xi });
+  if (!sources) return null;
 
   const personality = getPersonality(personalityId);
   const ensemble = blend(sources, personality.weights);
   const consensus = agreement(sources);
 
-  const context = {
+  const context = target.context ?? {
     home_form: formBefore(history, target.home),
     away_form: formBefore(history, target.away),
   };
@@ -111,7 +122,7 @@ export function replayMatch({ history, target, personalityId = 'ai-analyst', sim
   let evPct = pick.ev_pct ?? null;
   let kelly = pick.kelly_stake ?? null;
 
-  const minSample = Math.min(sampleFor(history, target.home), sampleFor(history, target.away));
+  const minSample = target.minSample ?? Math.min(sampleFor(history, target.home), sampleFor(history, target.away));
   const flags = [
     ...formVeto(context, pickedSide),
     ...consensusVsMarket(consensus, marketFair),
@@ -166,4 +177,4 @@ function averages(history, home, away) {
   };
 }
 
-export default { replayMatch, formBefore, sampleFor };
+export default { replayMatch, replaySources, formBefore, sampleFor };
