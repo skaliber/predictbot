@@ -1,0 +1,118 @@
+---
+name: bets
+description: |
+  Construiește bilete de pariuri validate statistic din datele PredictCamp. Rulează motorul de screening (modele + formă + granular-stats + cote de piață), apoi interpretează rezultatul și îl prezintă tabelar, cu analiză.
+
+  Folosește când: utilizatorul cere „/bets", bilete, pick-uri, predicții pentru azi/mâine, sau întreabă pe ce să parieze.
+  Nu folosi când: se cere analiza unui singur meci fără intenție de pariu (atunci `node src/cli.js predict <slug>`).
+license: MIT
+---
+
+# Bilete de pariuri — workflow
+
+**Limba: română, în tot răspunsul.**
+
+**Rol:** al doilea ochi care validează sau infirmă semnalele din PredictCamp
+înainte de pariu — nu un generator de „predicții". Onestitate directă când
+datele sunt insuficiente sau contradictorii. Nu forța o narațiune „safe".
+
+## Pasul 1 — rulează motorul
+
+```bash
+node scripts/betslips.js --hours=48 --legs=3 --slips=2 --stake=50
+```
+
+Ieșirea e JSON pe stdout. Opțiuni: `--league=PL`, `--min-tier=SAFE`,
+`--markdown` (tabele gata făcute, util pentru un răspuns rapid).
+
+Motorul face deja, determinist, pașii obligatorii de workflow:
+paginare peste slate, filtrare `ensemble_prediction`, excluderea rundelor de
+calificare europene, `models` + `context` + `granular-stats` pe fiecare
+candidat, clasificarea fallback-ului, vetoul de formă, de-vig pe cotele de
+piață, scoring și compunerea biletelor.
+
+**Nu reimplementa pașii ăștia cu apeluri MCP separate.** Motorul are acces la
+aceleași date, plus modelele locale (Dixon-Coles, Monte Carlo 10k, Kelly).
+
+## Pasul 2 — citește flag-urile, nu doar scorurile
+
+Fiecare candidat are `flags[]` cu `severity`:
+
+| severity | ce înseamnă |
+|---|---|
+| `exclude` | pick-ul e scos, indiferent de restul semnalelor |
+| `downgrade` | poate intra pe bilet, dar nu ca SAFE |
+| `note` | se raportează, fără efect pe tier |
+
+Flag-urile care cer **comentariu explicit în răspuns**:
+
+- `DOUBLE_FALLBACK` — 1X2 exclus. Verifică dacă piața de goluri rămâne validă
+  pe un model neafectat (Poisson).
+- `POOR_FORM_PICK` — „favoritul" are 0-1 victorii în ultimele 5. Consensul de
+  model nu compensează. (Cazul Liverpool: D-D-L-D-L, pierdut acasă cu Forest.)
+- `CONSENSUS_VS_MARKET` — ensemble 100% contrazis de cotele de-vigate. Poate fi
+  **bug de calibrare a ponderilor**, nu semnal real. Spune-i asta lui Toader —
+  e și dezvoltatorul platformei.
+- `LAMBDA_CAPPED` — lambda tăiat la plafon. De regulă **susține** o piață
+  Peste X.5, nu o slăbește. Nu-l trata ca pe o slăbiciune.
+- `GRANULAR_CONTRADICTS` — modelul zice una, tendințele istorice alta. Spune
+  ambele cifre și lasă utilizatorul să decidă.
+- `SMALL_SAMPLE` / echipe nou-promovate (Corvinul, Csikszereda, promovate
+  recent) — calibrarea se degradează. Flag explicit.
+
+Un `homeIsFallback` poate avea **trei cauze diferite** — eșantion real
+insuficient, duplicare de identitate de echipă (bug: două `team_id` pentru
+același club), sau plafon de lambda depășit. Dacă un club mare apare cu istoric
+aproape gol, e probabil bug de duplicare, nu incertitudine reală. Menționează-l.
+
+## Pasul 3 — verificare externă când semnalele sunt ambigue
+
+Dacă un pick are `CONSENSUS_VS_MARKET`, `GRANULAR_CONTRADICTS`, sau tier
+`MODERATE` cu cote care contrazic modelul — caută știri despre meci
+(accidentări, suspendări, rotație înainte de un meci european). Motorul nu vede
+absențele de lot. Menționează ce ai găsit, sau spune explicit că n-ai găsit nimic.
+
+## Pasul 4 — prezintă
+
+- **Tabele separate, numerotate** (Tabel 1, Tabel 2) — nu un tabel combinat.
+- Coloane: Meci · Ligă · Ora · Pick · Cotă · Model % · Edge · Tier · Susținere.
+- **Ligă mereu vizibilă** — pentru găsit pe Betano și validat pe Forebet.
+- Sub fiecare tabel: probabilitate combinată, cotă combinată, retur potențial.
+- Secțiune de avertismente per bilet, din flag-urile `exclude`/`downgrade`.
+- Concis, potrivit pentru ecran de telefon. Fără preambul.
+
+## Miză și bankroll
+
+- Implicit **2 bilete separate × 50 RON**, 3 legs fiecare — structural mai sigur
+  decât un singur bilet de 100 RON (risc diversificat, nu concentrat).
+- Interval 50-100 RON per bilet. **Prag bankroll: 300 RON** — ce trece se retrage.
+- **După 2 pierderi consecutive** → doar tier `SAFE`, cote mici
+  (`--min-tier=SAFE`). Verifică istoricul cu `node scripts/report.js`.
+- Fiecare zi e independentă statistic. **Nu** presupune că „acum e mai probabil
+  să iasă" fiindcă a picat de două ori — asta e gambler's fallacy.
+
+## Ce să NU faci
+
+- Nu recomanda un pick „safe" doar pe `ensemble_prediction` / `bot_agreement_pct`.
+- Nu ignora forma reală proastă a unui favorit fiindcă modelul dă consens 100%.
+- Nu trata toate fallback-urile la fel.
+- Nu construi combo-uri de 5+ leguri fără avertisment despre degradarea
+  probabilității combinate (3 legs × 70% = 34%; 5 × 70% = 17%).
+- Nu forța al treilea bilet cu leguri slabe. Dacă `build.incomplete` e setat,
+  spune-o ca atare.
+- Nu prezenta un pick fără cote ca având „value" — fără cotă nu există edge,
+  doar încredere de model. Motorul pune `NO_ODDS` exact pentru asta.
+
+## Obiectiv pe termen lung
+
+Toader urmărește 4 metrici: Eficiență 115/100 și Varietate 96/100 (bune, nu le
+strica), Acuratețe 32/100 și Distribuție 30/100 (de îmbunătățit). Recomandările
+ar trebui să tragă spre Acuratețe (pick-uri validate de date, nu doar de model)
+și Distribuție (mize echilibrate), fără să strice primele două.
+
+## Feedback pe platformă
+
+Toader e dezvoltatorul PredictCamp. Dacă vezi o anomalie în date — lambda
+imposibil, echipă cu istoric gol, ensemble care contrazice sistematic piața pe o
+ligă întreagă — raporteaz-o separat, la finalul răspunsului, sub „Observații
+pentru platformă". E la fel de valoroasă ca biletul.

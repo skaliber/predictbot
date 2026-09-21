@@ -20,7 +20,8 @@
     "serve": "node src/bin/serve.js",
     "lint": "node --check src/index.js",
     "settle": "node scripts/settle.js",
-    "report": "node scripts/report.js"
+    "report": "node scripts/report.js",
+    "bets": "node scripts/betslips.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
