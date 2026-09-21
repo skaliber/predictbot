@@ -121,6 +121,12 @@ Backtest walk-forward pe 912 meciuri, 5 ligi, sezonul 2025/26:
 
 Cifre complete și metodologie în [BACKTEST.md](BACKTEST.md).
 
+**Cercetare de piață** ([RESEARCH.md](RESEARCH.md)) — 32.171 de meciuri, 22 de
+ligi, 38 de strategii testate fără niciun model: nicio strategie nu iese pe
+plus, dar filtrarea la favoriți sub cota 1.60 reduce pierderea de la ~8% la
+~1.25%. Marja bookmakerului contează enorm. Pariurile pe oaspeți si pe
+outsiderul de acasa sunt cele mai proaste.
+
 ## Evaluare
 
 ```bash

@@ -8,7 +8,7 @@ import { devig } from '../betting/odds.js';
 import log from '../lib/log.js';
 import {
   classifyFallback, formSummary, formVeto, competitionFilter,
-  consensusVsMarket, granularMarkets, tierFor, safetyScore, flag,
+  consensusVsMarket, granularMarkets, marketRealityCheck, tierFor, safetyScore, flag,
 } from './screening.js';
 
 const SIDE_OF = { '1': 'home', X: 'draw', '2': 'away' };
@@ -51,6 +51,14 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
   ];
   if (!bundle.market_odds) {
     flags.push(flag('NO_ODDS', 'note', 'Fără cote de piață pentru acest meci — edge-ul nu poate fi calculat.'));
+  } else if (analysis.selection) {
+    const sel = analysis.candidates?.find((c) => c.selection === analysis.selection);
+    flags.push(...marketRealityCheck({
+      selection: analysis.selection,
+      odds: sel?.book_odds,
+      allOdds: bundle.market_odds['1x2'],
+      league: match?.league_code,
+    }));
   }
 
   const altMarkets = granularMarkets(granular);

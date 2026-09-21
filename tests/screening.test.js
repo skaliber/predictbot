@@ -357,3 +357,89 @@ test('altMarketOutcome rezolvă corect fiecare piață', async () => {
   assert.equal(altMarketOutcome(m(3, 0), 'BTTS No'), true);
   assert.equal(altMarketOutcome(m(1, 1), 'Handicap'), null);
 });
+
+// ---- verificarea de realitate pe segmente de piață (măsurată, nu modelată) ----
+
+test('bookmakerMargin calculează marja corect', async () => {
+  const { bookmakerMargin } = await import('../src/bot/marketPrior.js');
+  assert.ok(Math.abs(bookmakerMargin([3, 3, 3]) - 0) < 1e-9, 'piață fără marjă');
+  assert.ok(bookmakerMargin([2.5, 3.2, 3.0]) > 0);
+  assert.equal(bookmakerMargin([0.5, 3, 3]), null, 'cotă invalidă');
+  assert.equal(bookmakerMargin(null), null);
+});
+
+test('marketPrior ia cea mai pesimistă estimare, nu media', async () => {
+  const { marketPrior } = await import('../src/bot/marketPrior.js');
+  // Cotă mică (−1.19%) dar poziție „oaspeți" (−11.19%), pe o piață cu marjă
+  // normală (~5%, deci −6.58%) ⇒ poziția trebuie să domine.
+  const r = marketPrior({ selection: '2', odds: 1.45, allOdds: [5.5, 5.5, 1.45] });
+  assert.ok(r.margin_pct < 6, `marja trebuie să fie normală, e ${r.margin_pct}%`);
+  assert.equal(r.driver, 'poziție', JSON.stringify(r.parts));
+  assert.ok(r.expected_roi_pct <= -11, `${r.expected_roi_pct}`);
+  assert.ok(r.parts.length >= 3);
+});
+
+test('marketPrior semnalează ligile slabe măsurate', async () => {
+  const { marketPrior } = await import('../src/bot/marketPrior.js');
+  const r = marketPrior({ selection: '1', odds: 1.4, allOdds: [1.4, 4.5, 7], league: '60' });
+  assert.ok(r.parts.some((p) => p.source === 'ligă' && p.league === 'Ekstraklasa'));
+  assert.ok(r.expected_roi_pct <= -11);
+});
+
+test('marketPrior funcționează cu date parțiale', async () => {
+  const { marketPrior } = await import('../src/bot/marketPrior.js');
+  assert.ok(marketPrior({ selection: '1' }).parts.length === 1);
+  assert.equal(marketPrior({}), null);
+});
+
+test('isLeastBadCategory recunoaște doar favoritul scurt', async () => {
+  const { isLeastBadCategory, oddsForSelection } = await import('../src/bot/marketPrior.js');
+  assert.equal(isLeastBadCategory({ selection: '1', odds: 1.4, allOdds: [1.4, 4.5, 7] }), true);
+  assert.equal(isLeastBadCategory({ selection: '1', odds: 1.8, allOdds: [1.8, 3.5, 4] }), false, 'peste 1.60');
+  assert.equal(isLeastBadCategory({ selection: '2', odds: 1.4, allOdds: [1.4, 4.5, 7] }), false,
+    'selecția „2" are cota 7, nu 1.4 — cota se derivă din selecție');
+  assert.equal(isLeastBadCategory({ selection: 'X', odds: 1.4, allOdds: [1.4, 4.5, 7] }), false, 'egalul nu intră');
+});
+
+test('oddsForSelection derivă cota din selecție, nu o crede pe cuvânt', async () => {
+  const { oddsForSelection } = await import('../src/bot/marketPrior.js');
+  const all = [1.4, 4.5, 7];
+  assert.equal(oddsForSelection('1', 999, all), 1.4, 'setul complet are prioritate');
+  assert.equal(oddsForSelection('X', 999, all), 4.5);
+  assert.equal(oddsForSelection('2', 999, all), 7);
+  assert.equal(oddsForSelection('1', 1.4, null), 1.4, 'fără set complet, foloseşte cota dată');
+  assert.equal(oddsForSelection('Over 2.5', null, all), null, 'piață necunoscută');
+});
+
+test('marketRealityCheck degradează segmentele slabe', async () => {
+  const { marketRealityCheck } = await import('../src/bot/screening.js');
+  // Pariu pe oaspeți la cotă mare, marjă mare, ligă slabă — tot ce e prost.
+  const f = marketRealityCheck({ selection: '2', odds: 6.5, allOdds: [1.35, 5.0, 6.5], league: '60' });
+  const cs = f.map((x) => x.code);
+  assert.ok(cs.includes('BAD_MARKET_SEGMENT'));
+  assert.equal(f.find((x) => x.code === 'BAD_MARKET_SEGMENT').severity, 'downgrade');
+});
+
+test('marketRealityCheck semnalează marja mare separat', async () => {
+  const { marketRealityCheck } = await import('../src/bot/screening.js');
+  // Marjă ~14%, dar pariu pe favorit scurt.
+  const f = marketRealityCheck({ selection: '1', odds: 1.45, allOdds: [1.45, 4.2, 5.5] });
+  const hm = f.find((x) => x.code === 'HIGH_MARGIN');
+  assert.ok(hm, `marjă mare trebuie semnalată: ${JSON.stringify(f.map((x) => x.code))}`);
+  assert.match(hm.message, /alt bookmaker/);
+});
+
+test('marketRealityCheck marchează categoria cea mai bună măsurată', async () => {
+  const { marketRealityCheck } = await import('../src/bot/screening.js');
+  // Favorit scurt, marjă mică, ligă neutră.
+  const f = marketRealityCheck({ selection: '1', odds: 1.45, allOdds: [1.45, 4.8, 7.5], league: 'PL' });
+  const best = f.find((x) => x.code === 'BEST_MEASURED_CATEGORY');
+  assert.ok(best);
+  assert.equal(best.severity, 'note', 'informativ — nu e profit, e pierdere minimă');
+  assert.match(best.message, /Nu e profit/);
+});
+
+test('marketRealityCheck nu inventează flag-uri fără date', async () => {
+  const { marketRealityCheck } = await import('../src/bot/screening.js');
+  assert.deepEqual(marketRealityCheck({}), []);
+});

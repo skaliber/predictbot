@@ -19,6 +19,8 @@ const EURO_CUPS = /conference league|europa league|champions league/i;
 const SMALL_SAMPLE = Number(process.env.SCREEN_SMALL_SAMPLE ?? 30);
 const POOR_FORM_MAX_WINS = Number(process.env.SCREEN_POOR_FORM_MAX_WINS ?? 1);
 
+import { marketPrior, isLeastBadCategory } from './marketPrior.js';
+
 export function flag(code, severity, message, meta) {
   return { code, severity, message, ...(meta ? { meta } : {}) };
 }
@@ -191,6 +193,44 @@ export function granularMarkets(granular, { minSample = 10, minDelta = 10 } = {}
   return out.sort((a, b) => b.delta_vs_baseline - a.delta_vs_baseline);
 }
 
+/**
+ * Verificare de realitate peste orice pick: în ce categorie de piață intră, și
+ * cât a pierdut istoric cine a pariat orbește acolo (32.171 de meciuri).
+ *
+ * E independentă de model — de aceea e utilă. Modelul s-a dovedit redundant
+ * față de piață, dar frecvențele astea sunt măsurate direct pe cote și rezultate.
+ */
+export function marketRealityCheck({ selection, odds, allOdds, league }) {
+  const prior = marketPrior({ selection, odds, allOdds, league });
+  if (!prior) return [];
+  const flags = [];
+
+  if (prior.expected_roi_pct <= -10) {
+    flags.push(flag(
+      'BAD_MARKET_SEGMENT', 'downgrade',
+      `Categorie cu așteptare istorică slabă (${prior.expected_roi_pct}% ROI, după ${prior.driver}). ` +
+      'Pariurile din segmentul ăsta au pierdut consistent, indiferent de model.',
+      prior
+    ));
+  }
+  if (prior.margin_pct !== null && prior.margin_pct >= 8) {
+    flags.push(flag(
+      'HIGH_MARGIN', 'downgrade',
+      `Marja bookmakerului e ${prior.margin_pct}% — peste 8% ROI-ul istoric scade la −12%. ` +
+      'Caută alt bookmaker pentru același meci.',
+      { margin_pct: prior.margin_pct }
+    ));
+  }
+  if (isLeastBadCategory({ selection, odds, allOdds })) {
+    flags.push(flag(
+      'BEST_MEASURED_CATEGORY', 'note',
+      'Favorit sub cota 1.60 — singura categorie măsurată aproape de break-even ' +
+      '(−1.25% ± 0.70 pe 7.863 de pariuri). Nu e profit, dar e cea mai mică pierdere așteptată.'
+    ));
+  }
+  return flags;
+}
+
 /** Tier-ul final, din flag-uri + încredere + edge. */
 export function tierFor({ flags, probPct, edgePct }) {
   if (flags.some((f) => f.severity === 'exclude')) return 'EXCLUDED';
@@ -222,5 +262,5 @@ export function safetyScore({ probPct, edgePct, consensus, flags, granularDelta 
 export const THRESHOLDS = { SMALL_SAMPLE, POOR_FORM_MAX_WINS };
 export default {
   classifyFallback, formSummary, formVeto, competitionFilter,
-  consensusVsMarket, granularMarkets, tierFor, safetyScore, flag, THRESHOLDS,
+  consensusVsMarket, granularMarkets, marketRealityCheck, tierFor, safetyScore, flag, THRESHOLDS,
 };
