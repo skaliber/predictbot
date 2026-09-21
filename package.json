@@ -33,7 +33,8 @@
     "stacking": "node scripts/stackingReport.js",
     "xg": "node scripts/xgReport.js",
     "named-book": "node scripts/namedBookGap.js",
-    "my-odds": "node scripts/myOddsReport.js"
+    "my-odds": "node scripts/myOddsReport.js",
+    "sieve": "node scripts/sieveReport.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
