@@ -143,6 +143,32 @@ for (const r of bucketRoi(all.map((m) => bet(m, 1)), (b) => bucketize(spread(b.m
   console.log(String(r.bucket).padEnd(24) + fmt(r));
 }
 
+/* H8 — combinația: cele trei semnale care au ieșit în aceeași direcție */
+section('H8. Combinat — favorit scurt + marjă mică + ligă de top');
+console.log('H1, H3 și H5 arată toate spre același lucru. Combinate, cât de departe ajung?\n');
+header();
+const TOP = new Set(['PL', 'PD', 'SA', 'BL1', 'FL1', 'CL', '245', '6', '8']);
+const favOf = (m) => { const i = m.odds.indexOf(Math.min(...m.odds)); return bet(m, i); };
+
+const filters = [
+  ['toate pariurile', () => true],
+  ['doar favoritul', () => true],
+  ['+ cotă sub 2.00', (b) => b.odds < 2],
+  ['+ cotă sub 1.60', (b) => b.odds < 1.6],
+  ['+ marjă sub 6%', (b) => margin(b.m.odds) < 0.06],
+  ['+ ligă de top', (b) => TOP.has(b.m.league)],
+];
+let pool = all.map(favOf);
+console.log('doar favoritul'.padEnd(24) + fmt(flatRoi(pool)));
+let label = 'favorit';
+for (const [name, fn] of filters.slice(2)) {
+  pool = pool.filter(fn);
+  label += ` ${name.replace('+ ', '')}`;
+  console.log(name.padEnd(24) + fmt(flatRoi(pool)));
+  if (pool.length < 100) { console.log('   (eșantion prea mic pentru a continua)'); break; }
+}
+const compound = flatRoi(pool);
+
 /* Sinteză */
 section('Sinteză — ce a trecut pragul statistic');
 const candidates = [];
@@ -152,6 +178,7 @@ for (const [i, name] of [[0, 'H2 gazde'], [1, 'H2 egal'], [2, 'H2 oaspeți']]) c
 for (const r of bucketRoi(allBets, (b) => bucketize(margin(b.m.odds), marginEdges, marginLabels), marginLabels)) collect(`H3 marjă ${r.bucket}`, r);
 for (const r of byLeague) collect(`H5 ${r.bucket}`, r);
 collect('H6 gazde outsider ≥3', flatRoi(homeDogBig.map((m) => bet(m, 0))));
+collect('H8 combinat', compound);
 
 const strong = candidates.filter((c) => Math.abs(c.t) >= 2).sort((a, b) => b.t - a.t);
 if (!strong.length) {
