@@ -45,6 +45,7 @@ console.error(`Cotele tale: ${mine.length} meciuri\n`);
 
 const joined = [];
 const coverage = [];
+const corrupted = [];
 for (const [pcCode, fdCode] of [...Object.entries(MAIN), ...Object.entries(EXTRA)]) {
   const left = mine.filter((m) => m.league === pcCode);
   if (!left.length) continue;
@@ -61,6 +62,11 @@ for (const [pcCode, fdCode] of [...Object.entries(MAIN), ...Object.entries(EXTRA
   for (const { left: l, right: r } of pairs) {
     // Verificare de sanitate: scorul trebuie să coincidă, altfel lipirea e greșită.
     if (l.hg !== r.homeGoals || l.ag !== r.awayGoals) continue;
+    // Cote corupte: o selecție peste 1.5× prețul corect Pinnacle nu e un preț
+    // real (ex. Vitesse 301/10/1.06 — probabil cotă din timpul meciului salvată
+    // ca „pre"). 6 din ~15.000 de meciuri, dar umflau mediile de EV la +235%.
+    const pcFair = fair(r.books.pinnacle.close);
+    if ([l.o1, l.ox, l.o2].some((o, k) => o * pcFair[k] > 1.5)) { corrupted.push(`${l.date} ${l.home} ${l.o1}/${l.ox}/${l.o2}`); continue; }
     joined.push({
       league: pcCode, league_name: l.league_name, date: l.date,
       mine: [l.o1, l.ox, l.o2],
@@ -80,6 +86,7 @@ for (const c of coverage) {
     `${((c.matched / c.mine) * 100).toFixed(0)}%`.padStart(8) + String(c.ambiguous).padStart(9));
 }
 console.log(`\nTotal lipite cu scor identic: ${joined.length}`);
+console.log(`Excluse ca cote corupte (>1.5× prețul corect): ${corrupted.length}`);
 
 const f = (x, d = 1) => (x === null || x === undefined || Number.isNaN(x) ? '—' : x.toFixed(d));
 
