@@ -146,6 +146,19 @@ două personalități nu au voie să copieze aceeași selecție pe același meci
 date verificabile, ca să fie reproductibil și auditabil. Dacă adaugi o sursă de date,
 adaugă și bullet-ul corespunzător.
 
+## Skill-ul `/bets`
+
+`.claude/skills/bets/SKILL.md` + `scripts/betslips.js` + `src/bot/screening.js`.
+
+Împărțirea e intenționată: **scriptul face calculul determinist** (filtrare,
+reguli de excludere, scoring, compunerea biletelor), **skill-ul spune agentului
+cum să interpreteze** flag-urile și cum să prezinte. Regulile de screening sunt
+testate (`tests/screening.test.js`) — nu le muta în prompt.
+
+Flag-uri cu `severity: exclude` scot pick-ul; `downgrade` îl coboară din SAFE;
+`note` doar se raportează. Dacă adaugi o regulă nouă, adaug-o în
+`src/bot/screening.js` cu test, nu în SKILL.md.
+
 ## Comenzi
 
 ```bash
@@ -156,6 +169,7 @@ node src/cli.js bots
 npm run crawler                                    # generează + salvează predicții
 npm run settle                                     # atașează rezultatele reale
 npm run report                                     # leaderboard acuratețe/ROI
+npm run bets -- --hours=48 --markdown              # bilete (motorul pentru /bets)
 npm run backtest -- --refit --limit=200            # walk-forward Dixon-Coles
 npm run serve                                      # HTTP API pe PORT (3081)
 ./scripts/deploy.sh                                # deploy pe 62.171.157.32

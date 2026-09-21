@@ -66,6 +66,12 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
         flags.push(flag('GRANULAR_CONTRADICTS', 'downgrade',
           `granular-stats indică „${contra.selection}" (${contra.granular_pct}% vs baseline ${contra.league_baseline_pct}%), ` +
           `nu „${analysis.selection}".`, contra));
+      } else {
+        // granular-stats are date, dar nu pentru piața aleasă — la fel de
+        // neconfirmat ca lipsa totală de date.
+        flags.push(flag('NO_GRANULAR_FOR_MARKET', 'downgrade',
+          `granular-stats nu are semnal peste baseline pentru piața „${analysis.market}" ` +
+          `(are doar: ${altMarkets.map((m) => m.market).join(', ')}) — pick-ul rămâne neconfirmat.`));
       }
     }
   }

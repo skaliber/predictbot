@@ -57,6 +57,8 @@ Flag-urile care cer **comentariu explicit în răspuns**:
   Peste X.5, nu o slăbește. Nu-l trata ca pe o slăbiciune.
 - `GRANULAR_CONTRADICTS` — modelul zice una, tendințele istorice alta. Spune
   ambele cifre și lasă utilizatorul să decidă.
+- `NO_GRANULAR_FOR_MARKET` — granular-stats are date, dar nu pentru piața aleasă.
+  La fel de neconfirmat ca lipsa totală de date. Nu-l prezenta ca validat.
 - `SMALL_SAMPLE` / echipe nou-promovate (Corvinul, Csikszereda, promovate
   recent) — calibrarea se degradează. Flag explicit.
 

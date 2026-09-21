@@ -225,3 +225,76 @@ test('buildSlips raportează când lipsesc cotele', () => {
   assert.equal(slips[0].potential_return_ron, null);
   assert.ok(slips[0].combined_prob_pct > 0, 'probabilitatea se calculează oricum');
 });
+
+// ---- confirmarea din granular-stats pentru piețele alternative ----
+
+test('o piață alternativă fără semnal granular pe piața ei rămâne neconfirmată', async () => {
+  const { analyseMatch } = await import('../src/bot/betslips.js');
+  const { readFileSync } = await import('node:fs');
+  const fixture = JSON.parse(readFileSync(new URL('./fixtures/match-bundle.json', import.meta.url), 'utf8'));
+
+  const realFetch = globalThis.fetch;
+  const { limiter } = await import('../src/dataFetcher.js');
+  limiter.blockedUntil = 0;
+  globalThis.fetch = async (url) => {
+    const p = new URL(url).pathname;
+    if (p.endsWith('/models')) return new Response(JSON.stringify(fixture.models), { status: 200 });
+    if (p.endsWith('/context')) return new Response(JSON.stringify(fixture.context), { status: 200 });
+    if (p.endsWith('/granular-stats')) {
+      // Date doar pentru Over/Under — nimic pentru BTTS.
+      return new Response(JSON.stringify({ prediction_summary: { markets: [
+        { market: 'over_2_5', value_pct: 75, league_baseline_pct: 52, sample_size: 20 },
+      ] } }), { status: 200 });
+    }
+    return new Response('{}', { status: 200 });
+  };
+  try {
+    const r = await analyseMatch({
+      slug: 'a-vs-b', home_team: 'A', away_team: 'B',
+      league_name: 'Premier League', match_date: '2026-10-10T14:00:00Z',
+      ensemble_prediction: '1',
+    }, { simulations: 500 });
+
+    if (r.pick && r.pick.market === 'btts') {
+      const cs = r.flags.map((f) => f.code);
+      assert.ok(
+        cs.includes('NO_GRANULAR_FOR_MARKET') || cs.includes('GRANULAR_CONTRADICTS'),
+        `pick BTTS fără confirmare granular trebuie flagat, flags: ${cs.join(',')}`
+      );
+    }
+    // Pick-ul pe Over 2.5 e confirmat de granular ⇒ fără flag de neconfirmare.
+    if (r.pick && r.pick.selection === 'Over 2.5') {
+      assert.ok(!r.flags.some((f) => f.code === 'NO_GRANULAR_FOR_MARKET'));
+      assert.ok(r.support.granular_aligned, 'alinierea trebuie raportată');
+    }
+    assert.ok(['SAFE', 'MODERATE', 'RISKY', 'EXCLUDED'].includes(r.tier));
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('meciul fără ensemble_prediction e exclus înainte de orice fetch', async () => {
+  const { analyseMatch } = await import('../src/bot/betslips.js');
+  let called = false;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { called = true; return new Response('{}', { status: 200 }); };
+  try {
+    const r = await analyseMatch({ slug: 'x', league_name: 'Liga I', ensemble_prediction: null });
+    assert.equal(r.excluded, true);
+    assert.equal(r.flags[0].code, 'NO_ENSEMBLE');
+    assert.equal(called, false, 'nu se cheltuie cereri pe meciuri fără semnal');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('runda de calificare e exclusă fără fetch', async () => {
+  const { analyseMatch } = await import('../src/bot/betslips.js');
+  let called = false;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => { called = true; return new Response('{}', { status: 200 }); };
+  try {
+    const r = await analyseMatch({
+      slug: 'x', league_name: 'Europa League', round: 'Qualifying Round 3', ensemble_prediction: '1',
+    });
+    assert.equal(r.excluded, true);
+    assert.equal(r.flags[0].code, 'QUALIFYING_ROUND');
+    assert.equal(called, false);
+  } finally { globalThis.fetch = realFetch; }
+});
