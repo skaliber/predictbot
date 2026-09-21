@@ -22,3 +22,27 @@ test('RPS al unei predicții uniforme e sub baseline-ul degenerat', () => {
   const uniform = rps([1 / 3, 1 / 3, 1 / 3], 'X');
   assert.ok(uniform > 0 && uniform < 0.3);
 });
+
+test('RPS uniform NU e o constantă — depinde de rezultat', () => {
+  const U = [1 / 3, 1 / 3, 1 / 3];
+  // Egalul e „la mijloc": o predicție uniformă îl ratează mai puțin decât 1 sau 2.
+  const rpsDraw = rps(U, 'X');
+  const rpsHome = rps(U, '1');
+  const rpsAway = rps(U, '2');
+  close(rpsDraw, 1 / 9);
+  close(rpsHome, 5 / 18);
+  close(rpsAway, 5 / 18);
+  assert.ok(rpsDraw < rpsHome, 'a lua egalul ca baseline uniform e mai ieftin');
+  close(rpsHome, rpsAway, 1e-12); // simetric între gazde și oaspeți
+  // Media pe un set realist e sub valoarea extremă — de aceea nu se hardcodează.
+  const mix = (75 * rpsHome + 58 * rpsDraw + 57 * rpsAway) / 190;
+  assert.ok(mix < rpsHome, `media ${mix} trebuie sub extrema ${rpsHome}`);
+  assert.ok(Math.abs(mix - 0.227) < 0.005, `media reală ≈ 0.227, primit ${mix}`);
+});
+
+test('Brier uniform ESTE constant', () => {
+  const U = [1 / 3, 1 / 3, 1 / 3];
+  close(brier(U, '1'), 2 / 3);
+  close(brier(U, 'X'), 2 / 3);
+  close(brier(U, '2'), 2 / 3);
+});

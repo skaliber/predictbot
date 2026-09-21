@@ -103,6 +103,11 @@ async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrain
   // Baseline: „mereu gazdele" — cel mai simplu predictor posibil.
   let homeAlways = 0;
   const outcomes = { '1': 0, X: 0, '2': 0 };
+  // Baseline uniform, acumulat pe ACELEAȘI meciuri: Brier e constant (2/3), dar
+  // RPS depinde de rezultat (egalul se penalizează mai puțin decât 1 sau 2),
+  // deci nu poate fi o constantă — trebuie mediat pe rezultatele efective.
+  const UNIFORM = [1 / 3, 1 / 3, 1 / 3];
+  let uniformBrierSum = 0, uniformRpsSum = 0;
   for (let i = minTrain; i < usable.length && n < limit; i++) {
     const train = usable.slice(0, i);
     const target = usable[i];
@@ -122,14 +127,15 @@ async function backtestRefit({ limit = 200, league, from, to, minTrain: minTrain
     outcomes[outcome]++;
     brierSum += brier(probs, outcome);
     rpsSum += rps(probs, outcome);
+    uniformBrierSum += brier(UNIFORM, outcome);
+    uniformRpsSum += rps(UNIFORM, outcome);
     n++;
   }
 
   if (!n) { console.log('Niciun meci evaluabil.'); return; }
   console.log(`\nWalk-forward pe ${n} meciuri (antrenare ≥ ${minTrain}):`);
-  // Baseline uniform (1/3 fiecare) — reperul degenerat.
-  const uniformBrier = 2 / 3;
-  const uniformRps = (1 / 9 + 4 / 9) / 2;
+  const uniformBrier = uniformBrierSum / n;
+  const uniformRps = uniformRpsSum / n;
   console.log(`Distribuție reală: 1 ${outcomes['1']} / X ${outcomes.X} / 2 ${outcomes['2']}`);
   console.log('');
   console.log(`Acuratețe model:   ${((wins / n) * 100).toFixed(1)}%`);
