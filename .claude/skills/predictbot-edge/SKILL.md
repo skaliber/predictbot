@@ -162,3 +162,27 @@ Nu mai adăuga surse de date publice sau arhitecturi de model așteptând edge.
 Tot ce e public e deja în preț. Un slice nou merită testat doar dacă aduce
 **informație pe care piața n-o are la momentul pariului** — nu un model mai bun
 peste aceeași informație.
+
+## Named-book gap — singura direcție pozitivă (măsurat 2026-09-21)
+
+Sursa: [docs/adaptare-lnmomo-gambling.md](../../../docs/adaptare-lnmomo-gambling.md).
+
+Nu model vs piață, ci **o casă anume vs linia Pinnacle de-vigată**, fără model.
+34.481 de meciuri, 19 ligi:
+
+- Max pieței, EV ≥0–4% față de Pinnacle: **ROI +2.4% … +5.0%, p05 > 0, PASS**
+  pe 9–40 mii de pariuri. Neexecutabil ca atare (cont la toate casele, cote
+  eronate, limitare de cont).
+- Bet365 singur: ROI pozitiv în 7 din 8 rânduri, dar p05 < 0. FAIL, semn consistent.
+
+**Acesta e următorul loc unde merită săpat**, nu încă un model. Direcția
+practică: scanner de cote în timp real pe casele românești, față de Pinnacle.
+
+## Reguli noi de robustețe
+
+- Bootstrap **pe blocuri de zi**, nu pe pariu (`src/lib/robustness.js`).
+  Pariurile din aceeași zi sunt corelate.
+- Respinge dacă top-5 câștiguri depășesc 50% din profit.
+- Test sign-flip pe profitul zilnic, p ≤ 0.05.
+- **CLV-ul se raportează doar când decizia s-a luat înainte de referință.**
+  Altfel e identic cu EV-ul de filtrare. Capcana a apărut de două ori.

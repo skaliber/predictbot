@@ -291,10 +291,55 @@ Testat, cu date reale și walk-forward point-in-time:
 | Stacking | +0.22% față de blend, −0.31% față de piață |
 | xG | ajută modelul, nu-l duce peste piață |
 
-**Piața e eficientă pe tot ce avem acces.** Fiecare sursă de informație pe care
-o poate folosi un model public — goluri, formă, H2H, Elo, xG — e deja în preț.
+**Piața e eficientă față de orice model construit din date publice.** Fiecare
+sursă de informație — goluri, formă, H2H, Elo, xG — e deja în preț.
+
+*Actualizare:* piața nu e însă un singur preț. Vezi „Named-book gap" mai jos —
+line shopping-ul e singura direcție cu rezultat pozitiv.
 
 Ce ar putea schimba asta ține de informație, nu de model: absențe de lot
 înainte să intre în cotă, cote de deschidere prinse devreme, piețe unde
 bookmakerul are marjă mare și volum mic. Niciuna nu e accesibilă cu datele
 gratuite folosite aici.
+
+---
+
+# Named-book gap — primul rezultat pozitiv
+
+Ideea preluată din [lnmomo/Gambling](docs/adaptare-lnmomo-gambling.md): nu
+compara un model cu piața, compară **o casă anume** cu linia sharp (Pinnacle
+de-vigat). Fără niciun model. 34.481 de meciuri, 19 ligi, 5 sezoane, fără
+look-ahead. `node scripts/namedBookGap.js`.
+
+Verdict cu bootstrap pe blocuri de zi, concentrare și sign-flip.
+
+| Strategie | n | ROI | p05 | Verdict |
+|---|---|---|---|---|
+| **Max pieței, EV ≥0%** | 40.093 | **+2.4%** | **+1.2%** | PASS (neexecutabil) |
+| **Max pieței, EV ≥2%** | 19.466 | **+3.0%** | **+1.1%** | PASS (neexecutabil) |
+| **Max pieței, EV ≥4%** | 9.492 | **+5.0%** | **+1.8%** | PASS (neexecutabil) |
+| Bet365 deschidere, EV ≥0% | 3.784 | +3.8% | −0.9% | FAIL |
+| Bet365 deschidere, EV ≥4% | 530 | +7.6% | −7.0% | FAIL |
+| Bet365 închidere, EV ≥4% | 461 | +12.9% | −3.6% | FAIL |
+
+**Line shopping funcționează.** Să iei mereu cea mai bună cotă disponibilă, și
+doar când depășește prețul corect Pinnacle, bate piața cu 2–5% pe zeci de mii de
+pariuri, cu intervalul de încredere peste zero.
+
+Iar pe o singură casă reală (Bet365), ROI-ul e pozitiv în 7 din 8 rânduri. Nu
+trece de pragul de semnificație din cauza varianței, dar semnul e consistent —
+spre deosebire de toate testele bazate pe model, unde era negativ peste tot.
+
+**Contrastul e concluzia:** modelul nu prezice mai bine decât piața. Dar
+piața nu e un singur preț — casele diferă între ele, iar unele greșesc față de
+linia sharp. Edge-ul nu e în predicție, e în alegerea prețului.
+
+## De ce „Max" nu e profit în buzunar
+
+- Cea mai bună cotă dintre toate casele cere cont la toate.
+- Include cote eronate, pe care casele le anulează.
+- Casele limitează conturile care câștigă consistent din line shopping.
+- Sunt cote de închidere; cele disponibile la momentul pariului diferă.
+
+Rezultatul dovedește că edge-ul există în prețuri. Nu dovedește cât din el
+poate fi extras.
