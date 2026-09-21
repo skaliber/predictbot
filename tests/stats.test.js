@@ -32,7 +32,17 @@ test('Wilson se îngustează cu eșantionul', () => {
 });
 
 const row = (tier, hit, prob, odds, kelly = 0.02, flags = []) => ({
-  tier, hit, prob_pct: prob, odds, kelly_stake: kelly, flags,
+  tier, hit, prob_pct: prob, odds, kelly_stake: kelly, flags, selection: '1',
+});
+
+test('NO_BET nu poluează calibrarea și tabelul de flag-uri', () => {
+  const noBet = { tier: 'NO_BET', hit: false, selection: null, flags: [], prob_pct: 0 };
+  const rows = [row('SAFE', true, 75, 2), row('SAFE', false, 75, 2), noBet, noBet, noBet];
+  const b = calibrationBuckets(rows);
+  assert.equal(b.reduce((s, x) => s + x.n, 0), 2, 'doar pick-urile reale intră în calibrare');
+  // Dar tierTable îl raportează, fiindcă „n-am pariat" e o decizie, nu un eșec.
+  const t = tierTable(rows);
+  assert.equal(t.find((x) => x.tier === 'NO_BET').n, 3);
 });
 
 test('tierTable calculează rată, ROI flat și ROI Kelly', () => {

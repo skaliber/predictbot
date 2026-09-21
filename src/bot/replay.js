@@ -22,6 +22,7 @@ import { blend, agreement } from '../models/ensemble.js';
 import { devig } from '../betting/odds.js';
 import { evaluateBet } from '../betting/kelly.js';
 import { getPersonality } from './personalities.js';
+import { buildCandidates, selectPick } from './botLogic.js';
 import { formSummary, formVeto, consensusVsMarket, tierFor, safetyScore, flag, THRESHOLDS } from './screening.js';
 
 const OUTCOME = (h, a) => (h > a ? '1' : h === a ? 'X' : '2');
@@ -83,23 +84,32 @@ export function replayMatch({ history, target, personalityId = 'ai-analyst', sim
 
   const trio = ['1', 'X', '2'];
   const arr = [probs.home_win, probs.draw, probs.away_win];
-  const selection = trio[arr.indexOf(Math.max(...arr))];
-  const probPct = Math.round(Math.max(...arr) * 1000) / 10;
-  const pickedSide = SIDE_OF[selection];
+  const marketFair = target.odds ? devig(target.odds, { method: 'shin' }).fair_probabilities : null;
 
-  // Piața, dacă avem cote pre-kickoff.
-  let marketFair = null, edgePct = null, evPct = null, kelly = null, odds = null;
-  if (target.odds) {
-    marketFair = devig(target.odds, { method: 'shin' }).fair_probabilities;
-    odds = target.odds[trio.indexOf(selection)];
-    const ev = evaluateBet({
-      fairProb: Math.max(...arr), decimalOdds: odds,
-      kellyFraction: personality.policy.kellyFraction ?? 0.25, maxStake: 0.05,
-    });
-    edgePct = Math.round((Math.max(...arr) - marketFair[trio.indexOf(selection)]) * 1000) / 10;
-    evPct = Math.round(ev.ev_pct * 10) / 10;
-    kelly = ev.kelly_stake;
+  // Selecția trece prin ACELAȘI cod ca producția, ca să fie comparabilă:
+  // politica personalității (praguri, evitarea egalului, contrarian) contează.
+  // Doar 1X2 — piețele de goluri au nevoie de granular, care nu e replayabil.
+  const oneX2Personality = { ...personality, policy: { ...personality.policy, markets: ['1x2'] } };
+  const candidates = buildCandidates({
+    probs, secondary: {}, odds: target.odds ? { '1x2': target.odds } : null,
+    personality: oneX2Personality,
+  });
+  const { pick } = selectPick(candidates, oneX2Personality, { hasOdds: Boolean(target.odds) });
+  if (!pick) {
+    return {
+      slug: target.slug, date: target.date, league: target.league,
+      selection: null, no_bet: true, tier: 'NO_BET', probs: arr,
+      outcome: OUTCOME(target.homeGoals, target.awayGoals), hit: false, flags: [],
+    };
   }
+
+  const selection = pick.selection;
+  const probPct = pick.model_prob_pct;
+  const pickedSide = SIDE_OF[selection];
+  const odds = pick.book_odds ?? null;
+  let edgePct = pick.edge_pct ?? null;
+  let evPct = pick.ev_pct ?? null;
+  let kelly = pick.kelly_stake ?? null;
 
   const minSample = Math.min(sampleFor(history, target.home), sampleFor(history, target.away));
   const flags = [

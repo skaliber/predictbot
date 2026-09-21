@@ -19,7 +19,7 @@ export function wilsonInterval(successes, n, z = 1.96) {
   ];
 }
 
-const TIER_ORDER = ['SAFE', 'MODERATE', 'RISKY', 'EXCLUDED'];
+const TIER_ORDER = ['SAFE', 'MODERATE', 'RISKY', 'EXCLUDED', 'NO_BET'];
 
 /** Rata de reușită și ROI per tier. */
 export function tierTable(rows) {
@@ -53,6 +53,8 @@ export function tierTable(rows) {
  * frecvența reală. Un model calibrat spune 70% și nimerește în ~70% din cazuri.
  */
 export function calibrationBuckets(rows, edges = [0, 40, 50, 60, 70, 80, 101]) {
+  // NO_BET nu are probabilitate declarată — nu intră în calibrare.
+  rows = rows.filter((r) => r.selection);
   const out = [];
   for (let i = 0; i < edges.length - 1; i++) {
     const lo = edges[i], hi = edges[i + 1];
@@ -79,6 +81,7 @@ export function calibrationBuckets(rows, edges = [0, 40, 50, 60, 70, 80, 101]) {
  * pick-uri care chiar ies mai rar.
  */
 export function flagTable(rows) {
+  rows = rows.filter((r) => r.selection);
   const codes = [...new Set(rows.flatMap((r) => r.flags.map((f) => f.code)))];
   const out = [];
   for (const code of codes) {
