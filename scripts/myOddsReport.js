@@ -157,23 +157,52 @@ const printRows = (title, rows, note) => {
   if (note) console.log(note);
 };
 
-/* B. când sunt capturate cotele tale? */
+/* B. momentul capturii, și testul corect pe fiecare grup */
 const dist = (a, b) => a.reduce((s, x, i) => s + Math.abs(1 / x - 1 / b[i]), 0);
-let nearOpen = 0, nearClose = 0;
+const early = [], late = [];
 for (const j of joined) {
   if (!j.pinOpen) continue;
-  if (dist(j.mine, j.pinOpen) < dist(j.mine, j.pinClose)) nearOpen++; else nearClose++;
+  (dist(j.mine, j.pinOpen) < dist(j.mine, j.pinClose) ? early : late).push(j);
 }
 console.log(`\n${'═'.repeat(96)}`);
-console.log('B. CÂND SUNT CAPTURATE COTELE TALE?');
+console.log('B. MOMENTUL CAPTURII COTELOR TALE');
 console.log('═'.repeat(96));
-console.log(`Mai aproape de Pinnacle la închidere: ${nearClose}   la deschidere: ${nearOpen}`);
-console.log(nearClose > nearOpen
-  ? 'Cotele tale sunt de la închidere ⇒ comparația validă e cu Pinnacle la închidere (C), nu la deschidere.'
-  : 'Cotele tale sunt de la deschidere ⇒ comparația validă e cu Pinnacle la deschidere.');
+console.log(`Capturate devreme (aproape de Pinnacle la deschidere): ${early.length}`);
+console.log(`Capturate târziu  (aproape de Pinnacle la închidere):  ${late.length}`);
+console.log('Momentul e inconsecvent — fiecare grup se testează cu referința din același moment.');
 
-printRows('C. ACELAȘI MOMENT — cota ta vs Pinnacle LA ÎNCHIDERE (toate ligile)',
-  run('pinClose'), '⚠ Valid ca date. Operațional cere linia Pinnacle în timp real când pariezi — pe care n-o ai gratuit.');
+function runOn(set, refKey) {
+  const rows = [];
+  for (const th of THRESHOLDS) {
+    const bets = [];
+    for (const j of set) {
+      const pr = fair(j[refKey]), pc = fair(j.pinClose);
+      for (let k = 0; k < 3; k++) {
+        const ev = j.mine[k] * pr[k] - 1;
+        if (ev * 100 < th) continue;
+        const hit = j.outcome === OUT[k];
+        bets.push({ date: j.date, hit, odds: j.mine[k], profit: hit ? j.mine[k] - 1 : -1, ev,
+          clv: refKey === 'pinClose' ? null : (j.mine[k] * pc[k] - 1) * 100 });
+      }
+    }
+    if (bets.length < 30) continue;
+    const v = promotionVerdict(bets);
+    const clvs = bets.map((b) => b.clv).filter(Number.isFinite);
+    rows.push({ th, n: bets.length, hit: bets.filter((b) => b.hit).length / bets.length * 100,
+      odds: bets.reduce((a, b) => a + b.odds, 0) / bets.length,
+      ev: bets.reduce((a, b) => a + b.ev, 0) / bets.length * 100,
+      clv: clvs.length ? clvs.reduce((a, c) => a + c, 0) / clvs.length : null, ...v });
+  }
+  return rows;
+}
+
+printRows('B1. COTE CAPTURATE DEVREME vs Pinnacle LA DESCHIDERE — fără look-ahead',
+  runOn(early, 'pinOpen'), 'CLV = față de Pinnacle la închidere. Pozitiv = linia s-a mișcat în favoarea ta după ce ai pariat.');
+printRows('B2. COTE CAPTURATE TÂRZIU vs Pinnacle LA ÎNCHIDERE — același moment',
+  runOn(late, 'pinClose'), 'Valid ca date; operațional cere linia Pinnacle în timp real.');
+
+printRows('C. LIMITĂ SUPERIOARĂ — toate meciurile vs Pinnacle LA ÎNCHIDERE',
+  run('pinClose'), '⚠ Pentru cotele capturate devreme, asta e look-ahead. Arată cât valorează o linie sharp în timp real.');
 
 /* ---------- Liga I, separat ---------- */
 
@@ -192,6 +221,6 @@ if (ro.length) {
   console.log(`\nLiga I separat — ${ro.length} meciuri lipite, ${bets.length} rezultate unde cota ta bate Pinnacle la închidere:`);
   console.log(`  ROI ${f(v.bootstrap?.roi_pct)}%, interval [${f(v.bootstrap?.p05)}%, ${f(v.bootstrap?.p95)}%], ${v.verdict}` +
     (v.reasons.length ? ` (${v.reasons.join('; ')})` : ''));
-  console.log('  (același avertisment operațional ca la C)');
+  console.log('  (limită superioară — același avertisment ca la C)');
 }
 console.log();
