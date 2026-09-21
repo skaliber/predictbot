@@ -78,3 +78,44 @@ test('normalizeRow acceptă ambele scheme de nume de coloană', () => {
   assert.equal(extra.home, 'A');
   assert.equal(main.outcome, extra.outcome);
 });
+
+test('normalizeRow citește linia și cotele Asian Handicap', () => {
+  const r = normalizeRow({
+    Date: '16/08/2024', HomeTeam: 'A', AwayTeam: 'B', FTHG: '1', FTAG: '0',
+    AHh: '-0.75', PAHH: '1.95', PAHA: '1.97',
+    AHCh: '-0.5', PCAHH: '1.88', PCAHA: '2.04',
+  }, { league: 'E0' });
+  assert.equal(r.ahLineOpen, -0.75);
+  assert.equal(r.ahLineClose, -0.5);
+  assert.deepEqual(r.ahOpeningOdds, [1.95, 1.97]);
+  assert.deepEqual(r.ahClosingOdds, [1.88, 2.04]);
+});
+
+test('normalizeRow acceptă handicapul zero, care e o valoare validă', () => {
+  const r = normalizeRow({
+    Date: '16/08/2024', HomeTeam: 'A', AwayTeam: 'B', FTHG: '1', FTAG: '1',
+    AHh: '0', PAHH: '2.0', PAHA: '1.9',
+  }, { league: 'E0' });
+  assert.equal(r.ahLineOpen, 0, 'DNB e linie validă, nu „lipsă"');
+  assert.deepEqual(r.ahOpeningOdds, [2.0, 1.9]);
+});
+
+test('normalizeRow derivă BTTS din scor', () => {
+  const yes = normalizeRow({ Date: '01/01/2025', HomeTeam: 'A', AwayTeam: 'B', FTHG: '2', FTAG: '1' }, {});
+  const no = normalizeRow({ Date: '01/01/2025', HomeTeam: 'A', AwayTeam: 'B', FTHG: '3', FTAG: '0' }, {});
+  const nil = normalizeRow({ Date: '01/01/2025', HomeTeam: 'A', AwayTeam: 'B', FTHG: '0', FTAG: '0' }, {});
+  assert.equal(yes.btts, true);
+  assert.equal(no.btts, false);
+  assert.equal(nil.btts, false);
+});
+
+test('cheia de cache include versiunea schemei', async () => {
+  // Regresie: adăugarea cotelor AH a fost servită tăcut din cache-ul vechi,
+  // iar câmpurile apăreau undefined — arătând ca „sursa nu le are".
+  const { SCHEMA_VERSION } = await import('../src/lib/footballData.js');
+  assert.ok(Number.isInteger(SCHEMA_VERSION) && SCHEMA_VERSION >= 2);
+  const src = await import('node:fs/promises')
+    .then((fs) => fs.readFile(new URL('../src/lib/footballData.js', import.meta.url), 'utf8'));
+  assert.ok(/cached\(\[\s*'fd',\s*`v\$\{SCHEMA_VERSION\}`/.test(src),
+    'cheile de cache trebuie să conțină versiunea schemei');
+});

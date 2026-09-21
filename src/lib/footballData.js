@@ -15,6 +15,16 @@ import log from './log.js';
 
 const BASE = 'https://www.football-data.co.uk';
 
+/**
+ * Versiunea schemei de normalizare. INTRĂ ÎN CHEIA DE CACHE.
+ *
+ * Fără ea, adăugarea unui câmp nou în `normalizeRow` (ex. cotele AH) e servită
+ * tăcut din cache-ul vechi, iar câmpul apare `undefined` peste tot — ceea ce
+ * arată ca „sursa nu are datele", nu ca o eroare. Crește-o la orice schimbare
+ * de formă a rândului.
+ */
+const SCHEMA_VERSION = 2;
+
 /** CSV minimal: câmpuri între ghilimele, virgulă ca separator. */
 export function parseCsv(text) {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -147,7 +157,7 @@ async function fetchCsv(path) {
 
 /** O ligă principală, pentru un sezon (ex. E0 / 2425). Are Over/Under 2.5. */
 export async function loadMainLeague(code, season) {
-  return cached(['fd', 'main', code, season], async () => {
+  return cached(['fd', `v${SCHEMA_VERSION}`, 'main', code, season], async () => {
     const rows = parseCsv(await fetchCsv(`mmz4281/${season}/${code}.csv`));
     return rows.map((r) => normalizeRow(r, { league: code })).filter(Boolean);
   });
@@ -155,7 +165,7 @@ export async function loadMainLeague(code, season) {
 
 /** O ligă suplimentară (ex. ROU), toate sezoanele într-un fișier. Doar 1X2. */
 export async function loadExtraLeague(countryCode) {
-  return cached(['fd', 'extra', countryCode], async () => {
+  return cached(['fd', `v${SCHEMA_VERSION}`, 'extra', countryCode], async () => {
     const rows = parseCsv(await fetchCsv(`new/${countryCode}.csv`));
     return rows
       .map((r) => normalizeRow(r, { league: `${r.Country}/${r.League}`, country: r.Country }))
@@ -173,4 +183,5 @@ export async function loadMainSeasons(code, seasons) {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-export default { parseCsv, parseDate, normalizeRow, loadMainLeague, loadExtraLeague, loadMainSeasons };
+export { SCHEMA_VERSION };
+export default { parseCsv, parseDate, normalizeRow, loadMainLeague, loadExtraLeague, loadMainSeasons, SCHEMA_VERSION };
