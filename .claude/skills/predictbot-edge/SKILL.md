@@ -92,3 +92,58 @@ Return a table first, prose second:
 |---|---|---|---|---|---|---|
 
 Then: allowlist JSON or explicit "no promote".
+
+## Double Chance & Parlays (măsurat 2026-09-21)
+
+Walk-forward pe 9.193 de pick-uri, 6 ligi, 5 sezoane, cote reale de închidere.
+Vezi `RESEARCH.md` pentru metodologie.
+
+### Dublă șansă
+
+| Strategie | n | Reușită | Cotă | ROI | IC 95% |
+|---|---|---|---|---|---|
+| 1X2 simplu | 9193 | 51.5% | 2.08 | −2.0% | [−4.1, +0.1] |
+| dublă șansă pe pick | 9158 | 77.0% | 1.30 | −1.9% | [−3.0, −0.7] |
+| dublă șansă, încredere ≥60% | 2289 | 88.5% | 1.12 | −1.4% | [−2.9, +0.1] |
+
+**Nu e profitabil.** E doar mai puțin volatil decât 1X2. Cota se replică exact
+din piața 1X2 prin `1/(1/o_a + 1/o_b)`, deci nu există edge de preț — prin
+construcție.
+
+Observație: la 1X2, ROI-ul se înrăutățește cu încrederea (−2.0% → −3.2% →
+−4.4%). Piața prețuiește favoriții corect; modelul adaugă zgomot.
+
+### Parlays (3-4 picioare)
+
+**Marja se compune, nu se diluează.** ROI-ul real urmează `(1+r)^n − 1`:
+
+| Picioare | Rată (din 90.9%/picior) | ROI real | ROI teoretic |
+|---|---|---|---|
+| 1 | 90.9% | −3.0% | −3.0% |
+| 2 | 82.1% | −6.2% | −5.9% |
+| 3 | 74.0% | −9.9% | −8.7% |
+| 4 | 66.5% | −13.5% | −11.4% |
+
+Un bilet combinat nu dă semnal mai bun. Dă același semnal, cu mai mult risc și
+marjă plătită de mai multe ori.
+
+### Mișcarea liniei
+
+| Strategie | n | ROI | IC 95% |
+|---|---|---|---|
+| urmează steam-ul | 9192 | −2.8% | [−5.8, +0.1] |
+| fade steam-ul | 9192 | −6.3% | [−9.5, −2.9] |
+| steam, mișcare ≥3pp | 2386 | −0.7% | [−5.8, +4.5] |
+
+Semnal real (a urma banii bate a-i contrazice cu 3.5pp), dar **inutilizabil**:
+ca să știi unde s-a mutat linia trebuie să aștepți închiderea, moment în care
+prețul a absorbit deja mișcarea.
+
+## Reguli noi
+
+1. **Dubla șansă** e permisă doar ca *fallback* pentru încredere ≥60%, niciodată
+   ca strategie principală. Implicit oprită (`ALLOW_DOUBLE_CHANCE_FALLBACK`).
+2. **Parlays 3-4 picioare: interzise în producție.** Nu construi acumulatoare
+   „ca să crești valoarea" — scad ROI-ul monoton.
+3. **Mișcarea liniei: doar diagnostic**, nu generator de pick-uri.
+4. Un ROI de −1.4% **nu e „aproape profit"**. Nu crește miza pe baza lui.

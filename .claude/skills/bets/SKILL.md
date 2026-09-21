@@ -130,6 +130,18 @@ bate marja. Nu prezenta `SAFE` ca profitabil.
 `CONSENSUS_VS_MARKET` e cel mai puternic semnal măsurat (−32.3pp): când toate
 modelele sunt de acord împotriva pieței, piața are dreptate. E `exclude`.
 
+## Dublă șansă și bilete combinate
+
+`ALLOW_DOUBLE_CHANCE_FALLBACK=true` convertește pick-urile 1X2 cu încredere
+≥60% în dublă șansă. Măsurat: 88.5% rată de reușită, ROI −1.4%. **Prezintă-l
+ca „pierdere minimizată", nu ca oportunitate.** Avertismentul vine în câmpul
+`warning` — pune-l vizibil lângă pick.
+
+**Nu construi bilete de 3-4 picioare ca să „crești valoarea".** Măsurat pe
+date reale: marja se compune. Patru picioare la 90.9% fiecare dau 66.5% rată
+și ROI −13.5%, față de −3.0% pe un singur picior. Dacă utilizatorul cere un
+combinat, construiește-l, dar spune-i cifra.
+
 ## Ce să NU faci
 
 - Nu recomanda un pick „safe" doar pe `ensemble_prediction` / `bot_agreement_pct`.

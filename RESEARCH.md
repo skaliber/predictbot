@@ -142,10 +142,70 @@ Cotele sunt cele istorice din PredictCamp (`recorded_before_kickoff = true`),
 probabil cote de închidere. Cotele de deschidere ar putea fi mai slabe — asta
 rămâne netestat, fiindcă avem un singur instantaneu per meci.
 
+---
+
+# Dublă șansă, bilete combinate și mișcarea liniei
+
+9.193 de pick-uri walk-forward, 6 ligi (E0/E1/I1/SP1/D1/N1), 5 sezoane, cote
+reale de închidere. `node scripts/combinedReport.js`.
+
+## Dubla șansă bate 1X2 la orice prag
+
+| Strategie | n | Reușită | Cotă | ROI | IC 95% |
+|---|---|---|---|---|---|
+| 1X2 simplu | 9193 | 51.5% | 2.08 | −2.0% | [−4.1, +0.1] |
+| dublă șansă pe pick | 9158 | 77.0% | 1.30 | −1.9% | [−3.0, −0.7] |
+| 1X2, încredere ≥50% | 4461 | 60.7% | 1.67 | −3.2% | [−5.7, −0.8] |
+| dublă șansă, încredere ≥50% | 4461 | 84.1% | 1.18 | −1.6% | [−2.8, −0.2] |
+| **dublă șansă, încredere ≥60%** | 2289 | **88.5%** | 1.12 | **−1.4%** | [−2.9, +0.1] |
+| 1X2, încredere ≥70% | 1006 | 74.4% | 1.31 | −4.4% | [−7.8, −1.0] |
+
+Cel mai bun rezultat din toată cercetarea. Rămâne negativ.
+
+Observația secundară e la fel de importantă: **la 1X2, ROI-ul se înrăutățește
+pe măsură ce crește încrederea modelului** (−2.0% → −3.2% → −4.4%). Piața
+prețuiește favoriții corect; încrederea modelului adaugă zgomot, nu informație.
+
+## Biletele combinate: marja se compune
+
+| Strategie | Bilete | Ieșite | ROI real | ROI teoretic |
+|---|---|---|---|---|
+| încredere ≥70% · 1 picior | 1008 | 74.3% | −4.2% | −4.2% |
+| încredere ≥70% · 3 picioare | 336 | 39.9% | −13.1% | −12.2% |
+| încredere ≥70% · 4 picioare | 252 | 28.2% | −19.0% | −15.9% |
+| dublă șansă ≥70% · 1 picior | 1006 | 90.9% | −3.0% | −3.0% |
+| dublă șansă ≥70% · 4 picioare | 251 | 66.5% | −13.5% | −11.4% |
+
+Coloana teoretică e `(1+r)^n − 1`, iar realitatea o urmează aproape exact.
+Fiecare picior adaugă încă o dată marja bookmakerului.
+
+Chiar și la 90.9% reușită per picior, patru combinate cad la 66.5% și pierderea
+se triplează.
+
+## Mișcarea liniei: semnal real, inutilizabil
+
+| Strategie | n | Reușită | ROI | IC 95% |
+|---|---|---|---|---|
+| urmează steam-ul | 9192 | 39.7% | −2.8% | [−5.8, +0.1] |
+| fade steam-ul | 9192 | 33.6% | −6.3% | [−9.5, −2.9] |
+| steam, mișcare ≥3pp | 2386 | 43.2% | −0.7% | [−5.8, +4.5] |
+
+A urma banii bate a-i contrazice cu 3.5 puncte, iar efectul crește cu mărimea
+mișcării. Dar ca să știi unde s-a mutat linia trebuie să aștepți închiderea,
+când prețul a absorbit deja mișcarea. E o confirmare că piața funcționează,
+nu o strategie.
+
+„Model și steam de acord" (−2.3%) nu bate „în dezacord" (−1.7%): acordul cu
+banii nu îmbunătățește pick-urile modelului.
+
+---
+
 ## Reproducere
 
 ```bash
 node scripts/hypotheses.js --from=2021-08-01 --to=2026-06-30
+node scripts/combinedReport.js --main=E0,E1,I1,SP1,D1,N1 --seasons=2021,2122,2223,2324,2425
+node scripts/edgeReport.js --main=E0,E1,E2,I1,I2,SP1,SP2,D1,D2,N1 --seasons=2021,2122,2223,2324,2425
 ```
 
 Prima rulare descarcă datele (~10 min); următoarele folosesc cache-ul local

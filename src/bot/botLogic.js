@@ -16,6 +16,7 @@ import { blend, agreement } from '../models/ensemble.js';
 import { devig } from '../betting/odds.js';
 import { evaluateBet } from '../betting/kelly.js';
 import { getPersonality } from './personalities.js';
+import { toDoubleChance } from './doubleChance.js';
 import { buildReasoning } from './reasoning.js';
 
 const pct = (x) => Math.round(x * 1000) / 10;
@@ -292,7 +293,24 @@ export function runBot(bundle, options = {}) {
 
   const candidates = buildCandidates({ probs: adjusted, secondary, odds: effectiveOdds, personality, oddsFormat });
   const hasOdds = candidates.some((c) => Number.isFinite(c.edge_pct));
-  const { pick, alternatives, reason_no_bet } = selectPick(candidates, personality, { hasOdds });
+  let { pick, alternatives, reason_no_bet } = selectPick(candidates, personality, { hasOdds });
+
+  // Fallback pe dublă șansă — damage control, nu strategie. Oprit implicit
+  // (ALLOW_DOUBLE_CHANCE_FALLBACK). Nu schimbă miza și nu creează pick-uri noi:
+  // doar convertește un pick 1X2 deja selectat, cu încredere ≥60%.
+  const dc = toDoubleChance({
+    pick,
+    probs: {
+      homeWinPct: pct(adjusted.home_win),
+      drawPct: pct(adjusted.draw),
+      awayWinPct: pct(adjusted.away_win),
+    },
+    odds1x2: effectiveOdds?.['1x2'],
+  });
+  if (dc) {
+    alternatives = [pick, ...(alternatives ?? [])];
+    pick = dc;
+  }
 
   const analysis = {
     slug: bundle.slug,
@@ -333,6 +351,9 @@ export function runBot(bundle, options = {}) {
     ev_percent: pick?.ev_pct ?? null,
     kelly_stake: pick?.kelly_stake ?? null,
     no_bet_reason: pick ? null : reason_no_bet,
+    // Avertismentul însoțește pick-ul până în UI: un ROI de −1.4% nu e „aproape profit".
+    warning: pick?.warning ?? null,
+    converted_from: pick?.converted_from ?? null,
     reasoning,
   };
 }

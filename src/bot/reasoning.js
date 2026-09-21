@@ -108,6 +108,14 @@ export function buildReasoning({ analysis, pick, personality, context, reasonNoB
     );
   }
 
+  if (pick?.market === 'double_chance') {
+    bullets.push(
+      `Convertit din „${pick.converted_from.selection}" (${pick.converted_from.prob_pct}% încredere) în dublă șansă. ` +
+      `Cota ${pick.book_odds} e replicată din piața 1X2, deci nu există edge de preț.`
+    );
+    bullets.push(`⚠ ${pick.warning}`);
+  }
+
   const opener = VOICE_OPENERS[personality.voice] ?? VOICE_OPENERS.analytic;
   const summary = pick
     ? `${opener} Aleg ${pick.label} (${pick.selection}) la ${pick.model_prob_pct}% încredere` +
