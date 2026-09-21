@@ -42,7 +42,8 @@ test('eșantion mic degradează', () => {
   const f = classifyFallback({ elitul: { dixon_coles: { data_sufficiency: {
     homeIsFallback: false, awayIsFallback: false, sampleSize: { home: 12, away: 90 },
   } } } });
-  assert.equal(sev(f, 'SMALL_SAMPLE'), 'downgrade');
+  // Măsurat: +2.0pp, adică nu discriminează. Rămâne informativ.
+  assert.equal(sev(f, 'SMALL_SAMPLE'), 'note');
   assert.equal(f.find((x) => x.code === 'SMALL_SAMPLE').meta.sample, 12);
 });
 
@@ -69,7 +70,9 @@ test('veto de formă: 1 victorie în 5 exclude, oricât de tare ar fi consensul'
     { result: 'D' }, { result: 'D' }, { result: 'L' }, { result: 'D' }, { result: 'L' },
   ] };
   const f = formVeto(context, 'home');
-  assert.equal(sev(f, 'POOR_FORM_PICK'), 'exclude');
+  // Recalibrat pe 912 meciuri: efectul e real dar mic (−4.7pp), deci degradare,
+  // nu excludere — pick-urile astea ies totuși mai des decât cele RISKY.
+  assert.equal(sev(f, 'POOR_FORM_PICK'), 'downgrade');
   assert.match(f[0].message, /0 victorii/);
 });
 
@@ -106,8 +109,9 @@ test('consens 100% contrazis de piață ⇒ posibil bug de calibrare', () => {
   const consensus = { available: true, agreement_pct: 100, consensus: '1' };
   // Piața îl vede pe „2" clar favorit.
   const f = consensusVsMarket(consensus, [0.25, 0.25, 0.50]);
-  assert.equal(sev(f, 'CONSENSUS_VS_MARKET'), 'downgrade');
-  assert.match(f[0].message, /calibrare/);
+  // Cel mai puternic semnal măsurat (−32.3pp) ⇒ excludere, nu degradare.
+  assert.equal(sev(f, 'CONSENSUS_VS_MARKET'), 'exclude');
+  assert.match(f[0].message, /piața are dreptate/);
 });
 
 test('consens 100% în acord cu piața nu ridică flag', () => {

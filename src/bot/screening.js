@@ -12,11 +12,12 @@
 const QUALIFYING_RE = /qualif|preliminar|1st round|2nd round|3rd round/i;
 const EURO_CUPS = /conference league|europa league|champions league/i;
 
-/** Eșantion sub care modelul nu are pe ce să se bazeze într-o ligă. */
-const SMALL_SAMPLE = 30;
-
-/** Puncte din ultimele 5: sub acest prag, „favoritul" nu e favorit. */
-const POOR_FORM_MAX_WINS = 1;
+/**
+ * Praguri, configurabile prin env ca să poată fi recalibrate fără schimbare de cod.
+ * Valorile implicite sunt cele validate pe 912 meciuri (vezi BACKTEST.md).
+ */
+const SMALL_SAMPLE = Number(process.env.SCREEN_SMALL_SAMPLE ?? 30);
+const POOR_FORM_MAX_WINS = Number(process.env.SCREEN_POOR_FORM_MAX_WINS ?? 1);
 
 export function flag(code, severity, message, meta) {
   return { code, severity, message, ...(meta ? { meta } : {}) };
@@ -62,8 +63,11 @@ export function classifyFallback(models, { pickedSide } = {}) {
 
   const minSample = Math.min(sampleSize?.home ?? Infinity, sampleSize?.away ?? Infinity);
   if (Number.isFinite(minSample) && minSample < SMALL_SAMPLE) {
+    // Măsurat pe 912 meciuri: pick-urile cu acest flag ies cu +2.0pp MAI DES
+    // decât cele fără. Pragul de 30 se aprinde pe 77% din meciuri, deci nu
+    // discriminează nimic. Rămâne ca informație, nu ca penalizare.
     flags.push(flag(
-      'SMALL_SAMPLE', 'downgrade',
+      'SMALL_SAMPLE', 'note',
       `Eșantion mic pentru Dixon-Coles (${minSample} meciuri) — calibrare fragilă.`,
       { sample: minSample }
     ));
@@ -98,9 +102,12 @@ export function formVeto(context, pickedSide) {
   const s = formSummary(form);
   if (!s) return [flag('NO_FORM_DATA', 'downgrade', 'Fără date de formă pentru echipa aleasă.')];
   if (s.wins <= POOR_FORM_MAX_WINS) {
+    // Măsurat pe 912 meciuri: efect real, dar mic (−4.7pp, 45.7% vs 50.5%).
+    // `exclude` era prea dur — pick-urile astea ies totuși mai des decât cele
+    // etichetate RISKY (42.8%), deci a le arunca complet pierdea valoare.
     return [flag(
-      'POOR_FORM_PICK', 'exclude',
-      `Echipa aleasă are ${s.wins} victorii în ultimele ${s.matches} (${s.sequence}) — consensul de model nu compensează asta.`,
+      'POOR_FORM_PICK', 'downgrade',
+      `Echipa aleasă are ${s.wins} victorii în ultimele ${s.matches} (${s.sequence}) — formă slabă, −4.7pp măsurat.`,
       s
     )];
   }
@@ -131,10 +138,13 @@ export function consensusVsMarket(consensus, marketFairProbs) {
   const marketProb = marketFairProbs[label];
   const marketTop = Math.max(...marketFairProbs);
   if (marketProb < marketTop - 0.05) {
+    // Cel mai puternic semnal măsurat: −32.3pp (17.9% vs 50.1% pe 28 de meciuri).
+    // Când toate modelele sunt de acord ÎMPOTRIVA pieței, modelele greșesc.
     return [flag(
-      'CONSENSUS_VS_MARKET', 'downgrade',
+      'CONSENSUS_VS_MARKET', 'exclude',
       `Ensemble dă 100% acord pe „${consensus.consensus}", dar piața îl vede la ${(marketProb * 100).toFixed(1)}% ` +
-      `față de ${(marketTop * 100).toFixed(1)}% pentru alt rezultat — posibil bug de calibrare a ponderilor.`,
+      `față de ${(marketTop * 100).toFixed(1)}% pentru alt rezultat. Măsurat pe istoric: astfel de pick-uri ies ` +
+      `în 17.9% din cazuri, față de 50.1% în rest — piața are dreptate, nu modelul.`,
       { model: consensus.consensus, market_prob_pct: marketProb * 100 }
     )];
   }
