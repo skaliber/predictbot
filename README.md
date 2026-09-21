@@ -107,12 +107,19 @@ GET  /api/bots/:botId/history          → acuratețe, ROI Kelly, ROI flat, spli
 
 ## Cât de bun e, de fapt
 
-Backtest walk-forward pe 824 de meciuri, 5 ligi, sezonul 2025/26: **modelul e
-în urma pieței în toate ligile**, cu 1.8–7.6% pe RPS. Bate reperul naiv, dar
-nu bookmakerul — deci nu are edge sistematic. Cifre complete și metodologie
-în [BACKTEST.md](BACKTEST.md).
+Backtest walk-forward pe 912 meciuri, 5 ligi, sezonul 2025/26:
 
-Pragurile SAFE/MODERATE/RISKY **nu sunt încă validate pe date**.
+- **Modelul e în urma pieței în toate ligile** (1.8–7.6% pe RPS). Bate reperul
+  naiv, dar nu bookmakerul — deci nu are edge sistematic.
+- **Tier-urile ordonează corect riscul**: MODERATE (63.5%) se separă statistic
+  de RISKY (44.8%), iar EXCLUDED e la 17.9%. Dar ROI-ul e negativ peste tot.
+- **Trei reguli au fost recalibrate pe dovezi**, nu pe intuiție. Una
+  (`CONSENSUS_VS_MARKET`) s-a dovedit cel mai puternic semnal din sistem,
+  alta (`SMALL_SAMPLE`) nu discrimina deloc.
+- **Ponderile ensemble nu contează** — blendingul aduce 1–3%, ponderile exacte
+  nimic. **Semnalul granular e aproape zgomot.**
+
+Cifre complete și metodologie în [BACKTEST.md](BACKTEST.md).
 
 ## Evaluare
 

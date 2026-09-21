@@ -127,13 +127,97 @@ Folosește tier-urile ca **ordonare de risc**, nu ca promisiune de profit.
 node scripts/validateTiers.js --leagues=PL,PD,SA,BL1,FL1   --from=2025-08-01 --to=2026-06-30
 ```
 
+---
+
+# Personalitățile — 912 meciuri
+
+Fiecare personalitate trece prin același cod de selecție ca în producție
+(`buildCandidates` + `selectPick`), pe aceleași meciuri, doar 1X2.
+
+| Bot | Pick-uri | No-bet | Rată | IC 95% | ROI flat | ROI Kelly |
+|---|---|---|---|---|---|---|
+| statisticianul | 14 | 898 | 71.4% | 45–88% | **+23.0%** | +29.6% |
+| forma-zilei | 124 | 788 | 52.4% | 44–61% | −4.3% | −9.4% |
+| matematicianul | 231 | 681 | 50.6% | 44–57% | −9.2% | −11.2% |
+| istoricul | 49 | 863 | 51.0% | 37–64% | −9.9% | −7.2% |
+| ai-analyst | 72 | 840 | 48.6% | 37–60% | −10.3% | −9.7% |
+| underdog-lover | 505 | 407 | 16.2% | 13–20% | −12.8% | −18.3% |
+| value-hunter | 475 | 437 | 23.2% | 20–27% | −15.4% | −14.2% |
+
+**`statisticianul` e singurul cu ROI pozitiv — dar n=14.** Intervalul de
+încredere pe rata de reușită e 45–88%. La 14 pariuri din 912 meciuri nu se
+poate afirma nimic despre profitabilitate; e extrem de selectiv (încredere ≥58%,
+edge ≥4%, fără egal) și ar putea fi pur noroc. Merită urmărit, nu adoptat.
+
+**`value-hunter` are cel mai prost ROI — și asta e coerent.** El ordonează
+pick-urile după `edge`, iar backtestul de model a arătat că edge-ul e eroare de
+model, nu preț greșit. Maximizând edge-ul, maximizează eroarea. E cea mai
+curată confirmare că `edge_pct` nu e acționabil.
+
+RPS-ul e practic identic între boți (0.2031–0.2048): probabilitățile de bază
+sunt aceleași, diferă doar politica de selecție.
+
+---
+
+# Ponderile ensemble — nu contează
+
+Căutare pe 4000 de combinații, antrenare pe PL/PD/SA (598 meciuri), test pe
+BL1/FL1 (314) — ligi pe care optimizarea nu le-a văzut.
+
+| Variantă | Ponderi | RPS train | RPS test |
+|---|---|---|---|
+| optim pe train | DC .06 / MC .48 / Po .17 / Elo .29 | 0.20700 | 0.19539 |
+| actual (ai-analyst) | DC .35 / MC .00 / Po .15 / Elo .25 | 0.20716 | 0.19543 |
+| uniform | .25 fiecare | 0.20709 | 0.19539 |
+| doar Dixon-Coles | — | 0.20889 | 0.19639 |
+| doar Monte Carlo | — | 0.20873 | 0.19684 |
+| doar Elo | — | 0.20995 | 0.20090 |
+| doar Poisson | — | 0.21232 | 0.20206 |
+
+**Câștig pe test: 0.02%.** Îmbunătățirea nu se generalizează.
+
+Dar există un rezultat real: **orice combinație bate orice sursă singură.**
+Blendingul aduce 1–3%; ponderile exacte nu aduc nimic. Nu le-am schimbat —
+ar fi fost precizie falsă.
+
+---
+
+# Piețele alternative (granular) — aproape zgomot
+
+Endpoint-ul real se calculează *acum*, deci pentru un meci vechi ar include
+meciuri de după el. `historicalGranular` reconstruiește semnalul din meciuri
+strict anterioare, păstrând forma consumată de `granularMarkets()`.
+
+864 de semnale, prag de abatere 10pp:
+
+| Selecție indicată | n | Confirmat | Reper (fără semnal) | Efect |
+|---|---|---|---|---|
+| Over 2.5 | 169 | 54.4% | 53.0% | +1.4pp |
+| Under 2.5 | 149 | 49.0% | 47.0% | +2.0pp |
+| BTTS Yes | 164 | 59.8% | 54.2% | +5.6pp |
+| **BTTS No** | 146 | **43.2%** | 45.8% | **−2.6pp** |
+
+Mărimea abaterii aproape nu contează: 50.6% la 10–15pp, 52.4% la 15–20pp,
+55.3% la 20–30pp — cu intervale care se suprapun toate.
+
+**Concluzia: semnalul granular nu prezice.** `BTTS No` e chiar
+contraproductiv. Singurul cu semn pozitiv real e `BTTS Yes`.
+
+Am păstrat flag-urile ca filtru conservator — cer confirmare înainte de un
+pariu pe piață alternativă — dar mesajele spun acum explicit că e indiciu, nu
+verdict. Nu le-am transformat în `exclude`: n-ar fi justificat de date.
+
+---
+
 ## Ce rămâne nevalidat
 
-- Regulile bazate pe `granular-stats` (leakage în replay).
-- Clasificarea fallback-ului PredictCamp (`/models` dă 422 după meci) —
-  aproximată în replay prin eșantionul propriu.
-- Ponderile ensemble per personalitate — niciodată optimizate pe date.
-- Personalitățile în afară de `ai-analyst`.
+- **Clasificarea fallback-ului PredictCamp.** `/models` dă 422 după meci, deci
+  flag-urile reale (`homeIsFallback`, `LAMBDA_CAPPED`) nu se pot reconstrui.
+  În replay sunt aproximate prin eșantionul propriu.
+- **Conjuncția** „pick de model + confirmare granular" — validat semnalul
+  granular singur, nu combinația.
+- **`statisticianul`** — ROI pozitiv la n=14. Are nevoie de mai multe sezoane.
+- **Piețele de cornere și cartonașe** — nu sunt în replay deloc.
 
 ## Reproducere
 

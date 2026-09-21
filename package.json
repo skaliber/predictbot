@@ -21,7 +21,11 @@
     "lint": "node --check src/index.js",
     "settle": "node scripts/settle.js",
     "report": "node scripts/report.js",
-    "bets": "node scripts/betslips.js"
+    "bets": "node scripts/betslips.js",
+    "validate:tiers": "node scripts/validateTiers.js",
+    "validate:bots": "node scripts/validatePersonalities.js",
+    "validate:granular": "node scripts/validateGranular.js",
+    "optimize:weights": "node scripts/optimizeWeights.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

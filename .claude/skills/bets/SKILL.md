@@ -59,6 +59,13 @@ Flag-urile care cer **comentariu explicit în răspuns**:
   ambele cifre și lasă utilizatorul să decidă.
 - `NO_GRANULAR_FOR_MARKET` — granular-stats are date, dar nu pentru piața aleasă.
   La fel de neconfirmat ca lipsa totală de date. Nu-l prezenta ca validat.
+
+**Cât valorează confirmarea granular, măsurat pe 864 de semnale:** aproape
+nimic. Over 2.5 se confirmă în 54.4% din cazuri față de un reper de 53.0%;
+BTTS No în 43.2% față de 45.8% — mai prost decât reperul. Doar BTTS Yes are
+semn pozitiv (+5.6pp). Rămâne filtru conservator, nu dovadă. Când un pick e
+confirmat de granular, spune „e consistent cu tendința istorică", nu
+„e validat".
 - `SMALL_SAMPLE` / echipe nou-promovate (Corvinul, Csikszereda, promovate
   recent) — calibrarea se degradează. Flag explicit.
 

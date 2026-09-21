@@ -153,8 +153,17 @@ export function consensusVsMarket(consensus, marketFairProbs) {
 
 /**
  * Piețe alternative din granular-stats. Comparăm valoarea fixture-ului cu
- * baseline-ul ligii — probabilitățile brute din Poisson/MC nu sunt suficiente
- * pentru Over/Under și BTTS.
+ * baseline-ul ligii.
+ *
+ * ⚠️ Validat pe 864 de semnale reconstruite din istoric (vezi BACKTEST.md):
+ * semnalul e aproape zgomot. Over 2.5 se confirmă în 54.4% din cazuri față de
+ * un reper de 53.0% (+1.4pp), iar BTTS No în 43.2% față de 45.8% — adică MAI
+ * PROST decât reperul. Singurul cu semn pozitiv e BTTS Yes (+5.6pp).
+ * Mărimea abaterii aproape nu contează: 50.6% la 10–15pp, 55.3% la 20–30pp,
+ * cu intervale care se suprapun.
+ *
+ * Îl păstrăm ca filtru conservator (cere confirmare înainte de a paria pe o
+ * piață alternativă), dar NU e un predictor. Nu-l prezenta ca validare.
  */
 export function granularMarkets(granular, { minSample = 10, minDelta = 10 } = {}) {
   const out = [];
