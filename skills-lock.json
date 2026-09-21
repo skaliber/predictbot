@@ -19,11 +19,23 @@
       "skillPath": "skills/football-data/SKILL.md",
       "computedHash": "179a06ed38f2012fb5376c3fafe47766ef08e05945fd3ed59121ebf30d30f7d9"
     },
+    "kalshi": {
+      "source": "machina-sports/sports-skills",
+      "sourceType": "github",
+      "skillPath": "skills/kalshi/SKILL.md",
+      "computedHash": "f678121f91e6612669955b24140fad41b67c1b04c1756cae0b7332b8625d4596"
+    },
     "markets": {
       "source": "machina-sports/sports-skills",
       "sourceType": "github",
       "skillPath": "skills/markets/SKILL.md",
       "computedHash": "891f611c120da6e832280eb66668895e1be58c4e1d114425a2ead00ef02ab261"
+    },
+    "polymarket": {
+      "source": "machina-sports/sports-skills",
+      "sourceType": "github",
+      "skillPath": "skills/polymarket/SKILL.md",
+      "computedHash": "747e72613415765b3cf5bb2c8dff9f0a72522b43ec825d3fad6388564f70e853"
     },
     "walk-forward-validation": {
       "source": "agiprolabs/claude-trading-skills",
