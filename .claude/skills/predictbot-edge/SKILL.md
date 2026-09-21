@@ -147,3 +147,18 @@ prețul a absorbit deja mișcarea.
    „ca să crești valoarea" — scad ROI-ul monoton.
 3. **Mișcarea liniei: doar diagnostic**, nu generator de pick-uri.
 4. Un ROI de −1.4% **nu e „aproape profit"**. Nu crește miza pe baza lui.
+
+## Stacking și xG (măsurat 2026-09-21)
+
+- **Stacking** (meta-learner peste modele): +0.22% față de blend fix, −0.31%
+  față de piață pe 8.082 de meciuri. Modelele sunt prea corelate — nu reface
+  asta cu XGBoost sau rețele neuronale așteptând alt rezultat.
+- **xG** (FPL, Premier League): ajută modelul (+0.5 puncte fără piață), dar nu
+  adaugă nimic peste piață (−0.28%). Piața prețuiește deja xG-ul.
+
+## Regulă
+
+Nu mai adăuga surse de date publice sau arhitecturi de model așteptând edge.
+Tot ce e public e deja în preț. Un slice nou merită testat doar dacă aduce
+**informație pe care piața n-o are la momentul pariului** — nu un model mai bun
+peste aceeași informație.

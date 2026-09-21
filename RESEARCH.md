@@ -210,3 +210,91 @@ node scripts/edgeReport.js --main=E0,E1,E2,I1,I2,SP1,SP2,D1,D2,N1 --seasons=2021
 
 Prima rulare descarcă datele (~10 min); următoarele folosesc cache-ul local
 din `data/cache/`.
+
+---
+
+# Stacking și xG — ultimele două ipoteze
+
+## Stacking (meta-learner)
+
+Abordarea din `soumendu-11/fifa-wc2026-predictor`: regresie logistică
+multinomială peste predicțiile modelelor de bază, antrenată walk-forward.
+Plus adăugirea care lipsește acolo — prețul pieței ca feature. 8.082 de meciuri
+OOS, 6 ligi. `node scripts/stackingReport.js`.
+
+| Variantă | RPS | Log-loss | Acuratețe | vs piață |
+|---|---|---|---|---|
+| blend fix | 0.20291 | 0.9948 | 51.9% | −3.48% |
+| **piață singură** | **0.19608** | **0.9724** | 53.4% | — |
+| stacking fără piață | 0.20246 | 0.9937 | 52.0% | −3.26% |
+| stacking CU piață | 0.19668 | 0.9753 | 53.3% | −0.31% |
+| doar piața ca feature | 0.19624 | 0.9737 | 53.6% | −0.08% |
+
+Meta-learnerul bate blendingul fix cu doar +0.22%: modelele de bază sunt prea
+corelate ca să existe ce combina mai bine. **Problema nu e cum combini, ci ce
+combini.**
+
+## xG
+
+Understat a închis accesul programatic (pagina nu mai încorporează datele,
+endpoint-urile AJAX dau 404). Sursa folosită: `vaastav/Fantasy-Premier-League`,
+`expected_goals` per jucător per etapă, agregat pe echipă și meci. Doar Premier
+League, 2022/23–2025/26. 1.501 din 1.520 de meciuri lipite cu cotele (98.8%).
+834 de meciuri OOS. `node scripts/xgReport.js`.
+
+| Variantă | RPS | Acuratețe | vs piață |
+|---|---|---|---|
+| **piață singură** | **0.19791** | 53.2% | — |
+| stacking fără piață | 0.20575 | 51.2% | −3.96% |
+| stacking + xG, fără piață | 0.20471 | 52.4% | −3.44% |
+| stacking CU piață | 0.20044 | 52.5% | −1.28% |
+| stacking + xG CU piață | 0.20100 | 53.0% | −1.56% |
+
+Rezultatul are două părți, și ambele contează:
+
+1. **xG face modelul mai bun** — fără piață, câștigă 0.5 puncte (−3.96% →
+   −3.44%) și 1.2pp de acuratețe. Ipoteza că golurile sunt un semnal zgomotos
+   se confirmă.
+2. **Dar nu-l face mai bun decât piața.** Odată ce piața e în stack, xG-ul nu
+   mai adaugă nimic (−0.28%). **Piața prețuiește deja xG-ul** — informația e
+   reală, doar că nu e privată.
+
+### Limitări ale acestui test
+
+- **xG-ul e rotunjit la întreg** ca să intre în Dixon-Coles, care e un model
+  discret. Un meci cu 1.4 – 0.6 xG devine 1 – 1. Se pierde informație; un model
+  continuu pe xG (ex. Poisson cu λ = xG mediu) ar putea face mai bine.
+- **Eșantion mic**: 834 de meciuri OOS, o singură ligă. Meta-learnerul costă
+  singur ~0.3% din zgomot de estimare la mărimea asta („doar piața ca feature"
+  −0.34%, față de −0.08% pe 8.082 de meciuri).
+
+Niciuna nu schimbă concluzia direcțională: xG ajută modelul, nu îl duce peste
+piață.
+
+---
+
+# Concluzia întregii cercetări
+
+Testat, cu date reale și walk-forward point-in-time:
+
+| Ce | Rezultat |
+|---|---|
+| 1X2 pe 5 ligi mari | modelul e în urma pieței −1.8% … −7.6% |
+| 1X2 pe ligi mici (Liga I/II etc.) | la fel — amestecul optim e 0% model |
+| Over/Under 2.5 | 0 PASS din 66 de slice-uri |
+| Asian Handicap | 0 PASS din 19 slice-uri |
+| Dublă șansă | cea mai mică pierdere: −1.4% |
+| Bilete combinate | marja se compune: 4 picioare −13.5% |
+| Mișcarea liniei | semnal real, inutilizabil |
+| 38 de ipoteze de piață | niciuna pozitivă |
+| Ponderi optimizate | +0.02% pe test |
+| Stacking | +0.22% față de blend, −0.31% față de piață |
+| xG | ajută modelul, nu-l duce peste piață |
+
+**Piața e eficientă pe tot ce avem acces.** Fiecare sursă de informație pe care
+o poate folosi un model public — goluri, formă, H2H, Elo, xG — e deja în preț.
+
+Ce ar putea schimba asta ține de informație, nu de model: absențe de lot
+înainte să intre în cotă, cote de deschidere prinse devreme, piețe unde
+bookmakerul are marjă mare și volum mic. Niciuna nu e accesibilă cu datele
+gratuite folosite aici.
