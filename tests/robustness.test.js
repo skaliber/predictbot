@@ -93,3 +93,12 @@ test('promotionVerdict trece doar pe profit robust, pe multe zile', () => {
   const v = promotionVerdict(bets);
   assert.equal(v.verdict, 'PASS', v.reasons.join('; '));
 });
+
+test('CLV la închidere nu se raportează — ar fi circular', async () => {
+  // Regresie pentru capcana prinsă de două ori: dacă filtrezi pe
+  // „cotă × p_referință − 1 ≥ prag" și referința e închiderea, atunci CLV-ul
+  // față de închidere e exact aceeași cantitate. Scriptul trebuie să-l ascundă.
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../scripts/namedBookGap.js', import.meta.url), 'utf8');
+  assert.match(src, /st\.ref !== 'close'/, 'CLV trebuie calculat doar când referința nu e închiderea');
+});

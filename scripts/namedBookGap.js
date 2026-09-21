@@ -79,8 +79,11 @@ for (const st of STRATEGIES) {
           profit: hit ? execOdds[k] - 1 : -1,
           ev,
           cons_ev: conservativeEv({ prob: pRef[k], odds: execOdds[k] }),
-          // CLV: cota ta vs cota corectă la închiderea Pinnacle.
-          clv_pct: pClose ? (execOdds[k] * pClose[k] - 1) * 100 : null,
+          // CLV: cota ta vs cota corectă la închiderea Pinnacle. Are sens DOAR
+          // când decizia s-a luat înainte de închidere. Dacă referința e deja
+          // închiderea, CLV = EV-ul după care am filtrat — circular, nu măsoară
+          // nimic. Aceeași capcană prinsă în edgeReport.
+          clv_pct: pClose && st.ref !== 'close' ? (execOdds[k] * pClose[k] - 1) * 100 : null,
         });
       }
     }
@@ -121,6 +124,7 @@ for (const r of results) {
 }
 console.log('─'.repeat(118));
 console.log('* = neexecutabil: media și maximul nu sunt prețul unei case anume.');
+console.log('CLV „—" = decizia s-a luat la închidere, deci CLV ar fi identic cu EV-ul de filtrare (circular).');
 console.log('„EV decl." = ce promite comparația cu Pinnacle. ROI = ce s-a întâmplat de fapt.\n');
 
 // Pe ligă, doar pentru strategia executabilă de la închidere, la prag zero.
