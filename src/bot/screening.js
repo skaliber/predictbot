@@ -129,10 +129,25 @@ export function competitionFilter(match) {
 }
 
 /**
+ * Acordul modelelor PredictCamp vine dintr-o singură sursă (de ex. meciuri de
+ * națională: Poisson, DC, MC și Elo derivă toate din același rating Elo).
+ * API-ul o semnalează prin `models_consensus.reason = 'single_source'` sau
+ * `ensemble.single_source = true`. Atunci 100% acord nu e consens.
+ */
+export function isSingleSource(models) {
+  return models?.models_consensus?.reason === 'single_source'
+    || models?.ensemble?.single_source === true;
+}
+
+/**
  * „100% STRONG" contrazis de piață: poate fi bug de calibrare a ponderilor,
  * nu semnal real. Se raportează explicit.
+ *
+ * Cu `singleSource`, acordul nu e consens: nu se raportează CONSENSUS_VS_MARKET
+ * (nici ca bug de platformă), ci SINGLE_SOURCE_VS_MARKET — un singur rating
+ * contrazice piața, deci pick-ul pe partea modelului nu poate fi SAFE.
  */
-export function consensusVsMarket(consensus, marketFairProbs) {
+export function consensusVsMarket(consensus, marketFairProbs, { singleSource = false } = {}) {
   if (!consensus?.available || consensus.agreement_pct < 100) return [];
   if (!marketFairProbs) return [];
   const label = { '1': 0, X: 1, '2': 2 }[consensus.consensus];
@@ -140,6 +155,14 @@ export function consensusVsMarket(consensus, marketFairProbs) {
   const marketProb = marketFairProbs[label];
   const marketTop = Math.max(...marketFairProbs);
   if (marketProb < marketTop - 0.05) {
+    if (singleSource) {
+      return [flag(
+        'SINGLE_SOURCE_VS_MARKET', 'downgrade',
+        `Modelele dau „${consensus.consensus}", dar toate derivă din același rating (single_source) — nu e consens. ` +
+        `Piața îl vede la ${(marketProb * 100).toFixed(1)}% față de ${(marketTop * 100).toFixed(1)}% pentru alt rezultat.`,
+        { model: consensus.consensus, market_prob_pct: marketProb * 100 }
+      )];
+    }
     // Cel mai puternic semnal măsurat: −32.3pp (17.9% vs 50.1% pe 28 de meciuri).
     // Când toate modelele sunt de acord ÎMPOTRIVA pieței, modelele greșesc.
     return [flag(
@@ -246,7 +269,8 @@ export function tierFor({ flags, probPct, edgePct }) {
 /** Scor 0–100 pentru ordonare. Nu e probabilitate, e prioritate de selecție. */
 export function safetyScore({ probPct, edgePct, consensus, flags, granularDelta }) {
   let score = probPct ?? 50;
-  if (consensus?.available) {
+  // Acordul dintr-o singură sursă nu e consens — fără bonus.
+  if (consensus?.available && !consensus.single_source) {
     score += (consensus.agreement_pct - 50) * 0.15;
     if (consensus.signal === 'STRONG') score += 4;
   }
@@ -262,5 +286,5 @@ export function safetyScore({ probPct, edgePct, consensus, flags, granularDelta 
 export const THRESHOLDS = { SMALL_SAMPLE, POOR_FORM_MAX_WINS };
 export default {
   classifyFallback, formSummary, formVeto, competitionFilter,
-  consensusVsMarket, granularMarkets, marketRealityCheck, tierFor, safetyScore, flag, THRESHOLDS,
+  consensusVsMarket, isSingleSource, granularMarkets, marketRealityCheck, tierFor, safetyScore, flag, THRESHOLDS,
 };
