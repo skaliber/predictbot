@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classifyFallback, formSummary, formVeto, competitionFilter,
-  consensusVsMarket, granularMarkets, tierFor, safetyScore,
+  consensusVsMarket, isSingleSource, granularMarkets, tierFor, safetyScore,
 } from '../src/bot/screening.js';
 import { buildSlips } from '../src/bot/betslips.js';
 
@@ -120,6 +120,30 @@ test('consens 100% în acord cu piața nu ridică flag', () => {
   assert.deepEqual(consensusVsMarket({ available: true, agreement_pct: 75, consensus: '1' }, [0.2, 0.2, 0.6]), [],
     'sub 100% nu e „STRONG contrazis"');
   assert.deepEqual(consensusVsMarket(consensus, null), [], 'fără cote nu se poate compara');
+});
+
+test('acord dintr-o singură sursă (single_source) nu e raportat drept consens', () => {
+  assert.equal(isSingleSource({ models_consensus: { reason: 'single_source' } }), true);
+  assert.equal(isSingleSource({ ensemble: { single_source: true } }), true);
+  assert.equal(isSingleSource({ models_consensus: { reason: 'agreement' }, ensemble: {} }), false);
+  assert.equal(isSingleSource(null), false);
+
+  // Italia–Belgia: modelele (toate din Elo) dau „2", piața dă „1".
+  const consensus = { available: true, agreement_pct: 100, consensus: '2' };
+  const market = [0.443, 0.265, 0.293];
+  const f = consensusVsMarket(consensus, market, { singleSource: true });
+  assert.equal(sev(f, 'CONSENSUS_VS_MARKET'), undefined, 'nu se raportează ca consens / bug de calibrare');
+  assert.equal(sev(f, 'SINGLE_SOURCE_VS_MARKET'), 'downgrade');
+  assert.equal(sev(consensusVsMarket(consensus, market), 'CONSENSUS_VS_MARKET'), 'exclude',
+    'fără single_source regula rămâne neschimbată');
+});
+
+test('safetyScore nu dă bonus de acord pentru single_source', () => {
+  const consensus = { available: true, agreement_pct: 100, signal: 'STRONG' };
+  const real = safetyScore({ probPct: 60, consensus, flags: [] });
+  const single = safetyScore({ probPct: 60, consensus: { ...consensus, single_source: true }, flags: [] });
+  assert.equal(single, 60);
+  assert.ok(real > single);
 });
 
 test('granularMarkets alege partea corectă față de baseline-ul ligii', () => {

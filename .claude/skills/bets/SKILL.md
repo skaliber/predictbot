@@ -102,6 +102,11 @@ Flag-urile care cer **comentariu explicit în răspuns**:
 - `CONSENSUS_VS_MARKET` — ensemble 100% contrazis de cotele de-vigate. Poate fi
   **bug de calibrare a ponderilor**, nu semnal real. Spune-i asta lui Toader —
   e și dezvoltatorul platformei.
+- `SINGLE_SOURCE_VS_MARKET` — modelele contrazic piața, dar API-ul marchează
+  acordul ca `single_source` (toate din același rating Elo, tipic la naționale).
+  **Nu** e consens și **nu** e bug de calibrare — nu-l trece la „Observații
+  pentru platformă". Spune simplu: „un singur rating (Elo) contrazice piața;
+  piața are prioritate". Pick-ul pe partea modelului nu poate fi SAFE.
 - `LAMBDA_CAPPED` — lambda tăiat la plafon. De regulă **susține** o piață
   Peste X.5, nu o slăbește. Nu-l trata ca pe o slăbiciune.
 - `GRANULAR_CONTRADICTS` — modelul zice una, tendințele istorice alta. Spune
@@ -220,3 +225,8 @@ Toader e dezvoltatorul PredictCamp. Dacă vezi o anomalie în date — lambda
 imposibil, echipă cu istoric gol, ensemble care contrazice sistematic piața pe o
 ligă întreagă — raporteaz-o separat, la finalul răspunsului, sub „Observații
 pentru platformă". E la fel de valoroasă ca biletul.
+
+**Nu raporta ca anomalie** (deja explicate de platformă):
+- Acord 100% cu `single_source` contra pieței, la meciuri de națională. Cauza e diferența Elo, nu un bug.
+- Peste 2.5 / GG aproape identice pe toate meciurile de națională. Lipsește baza de ligă (`international_no_league_baseline`), iar valorile variază doar din Elo.
+- Asimetria regulii de pauză lungă pe cluburi (×0.97 doar pe gazdă). E cunoscută și urmează să fie măsurată pe istoric.

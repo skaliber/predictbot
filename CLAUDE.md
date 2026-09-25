@@ -8,7 +8,7 @@ Kelly) și 7 personalități care decid diferit pe același meci.
 **cod → test → commit → push**. Niciun commit fără `npm test` verde.
 
 ```bash
-npm test          # node --test, 67 teste
+npm test          # node --test
 npm run lint      # node --check
 ```
 
@@ -85,6 +85,23 @@ conversia se face o singură dată, în `buildModelSources`.
 
 `ensemble.prediction` e predicția autoritară a PredictCamp; `models_consensus`
 raportează doar semnal de acord, nu o predicție.
+
+**`single_source` — acord care nu e consens.** Pe meciurile fără bază de ligă
+(naționale: Liga Națiunilor, preliminarii) toate modelele PredictCamp derivă din
+același rating Elo (eloratings.net). API-ul semnalează asta prin
+`models_consensus.reason = 'single_source'` și/sau `ensemble.single_source = true`.
+Atunci „100% acord" e un singur vot repetat: `screening.isSingleSource()` îl
+detectează, `CONSENSUS_VS_MARKET` devine `SINGLE_SOURCE_VS_MARKET` (`downgrade`),
+iar `safetyScore` nu mai dă bonus de acord. **Nu** raporta aceste cazuri
+platformei drept bug de calibrare — e comportament documentat.
+
+Fix PredictCamp (25 sep 2026, verificat în producție pe 30 de meciuri NL):
+λ gazdă și λ oaspete ies acum exact din formulă (înainte gazda primea ×0.970 pe
+toate), avantajul terenului e din nou +50 Elo întreg în Poisson/MC/DC/boți,
+iar Peste 2.5 pe meciurile echilibrate a urcat cu ~1 pp. Când modelul dă
+oaspetele favorit contra pieței (Italia–Belgia, Ungaria–Ucraina), cauza e
+diferența Elo (Belgia +78, Ucraina +70), nu un bug. Regula de pauză lungă
+(×0.97 doar pe gazdă) rămâne asimetrică pe cluburi până se măsoară pe istoric.
 
 Fără `PREDICTCAMP_API_KEY` toate endpoint-urile de date întorc `401 INVALID_API_KEY`.
 Testele **nu** ating rețeaua — rulează pe `tests/fixtures/match-bundle.json`.

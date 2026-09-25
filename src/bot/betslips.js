@@ -9,7 +9,7 @@ import { devig } from '../betting/odds.js';
 import log from '../lib/log.js';
 import {
   classifyFallback, formSummary, formVeto, competitionFilter,
-  consensusVsMarket, granularMarkets, marketRealityCheck, tierFor, safetyScore, flag,
+  consensusVsMarket, isSingleSource, granularMarkets, marketRealityCheck, tierFor, safetyScore, flag,
 } from './screening.js';
 
 const SIDE_OF = { '1': 'home', X: 'draw', '2': 'away' };
@@ -44,11 +44,16 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
     ? devig(bundle.market_odds['1x2'], { method: 'shin' }).fair_probabilities
     : null;
 
+  const singleSource = isSingleSource(bundle.models);
+  const consensus = analysis.models_consensus
+    ? { ...analysis.models_consensus, ...(singleSource ? { single_source: true } : {}) }
+    : analysis.models_consensus;
+
   const flags = [
     ...compFlags,
     ...classifyFallback(bundle.models, { pickedSide }),
     ...(analysis.market === '1x2' ? formVeto(bundle.context, pickedSide) : []),
-    ...consensusVsMarket(analysis.models_consensus, marketFair),
+    ...consensusVsMarket(analysis.models_consensus, marketFair, { singleSource }),
   ];
   if (!bundle.market_odds) {
     flags.push(flag('NO_ODDS', 'note', 'Fără cote de piață pentru acest meci — edge-ul nu poate fi calculat.'));
@@ -95,7 +100,7 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
   const edgePct = analysis.edge_pct;
   const tier = tierFor({ flags, probPct: probPct ?? 0, edgePct });
   const score = safetyScore({
-    probPct, edgePct, consensus: analysis.models_consensus, flags,
+    probPct, edgePct, consensus, flags,
     granularDelta: aligned?.delta_vs_baseline,
   });
 
@@ -122,7 +127,7 @@ export async function analyseMatch(match, { personalityId = 'ai-analyst', simula
     no_bet_reason: analysis.no_bet_reason ?? null,
     support: {
       probabilities: analysis.probabilities,
-      consensus: analysis.models_consensus,
+      consensus,
       models_used: analysis.models_used,
       dixon_coles: analysis.models_detail?.dixon_coles ?? null,
       monte_carlo: analysis.models_detail?.monte_carlo ?? null,
